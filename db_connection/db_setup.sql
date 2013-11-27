@@ -4,6 +4,7 @@ DROP TABLE IF EXISTS ql_players;
 DROP TABLE IF EXISTS ql_roles;
 DROP TABLE IF EXISTS ql_waves;
 DROP TABLE IF EXISTS ql_actions;
+DROP TABLE IF EXISTS ql_time;
 
 -- PLAYERS
 
@@ -39,4 +40,11 @@ CREATE TABLE IF NOT EXISTS ql_actions (
 	player_id INT NOT NULL,
 	type INT NOT NULL,
 	target_id INT NOT NULL,
+	day INT NOT NULL,
 	PRIMARY KEY (id) );
+
+-- TIME
+
+CREATE TABLE IF NOT EXISTS ql_time (
+	day INT NOT NULL,
+	phase INT NOT NULL );
