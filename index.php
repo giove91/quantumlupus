@@ -13,7 +13,7 @@ $res = query($query);
 if ( !($row = $res->fetch_assoc()) ) {
 	// Partita non ancora settata
 	
-	
+	paragraph("La partita non è stata ancora creata.");
 }
 
 
