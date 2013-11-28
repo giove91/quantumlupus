@@ -23,21 +23,29 @@ else {
 	$logged = FALSE;
 	$user = "";
 	$password = "";
+	$player_id = NULL;
 	if ( isset($_POST["user"]) && isset($_POST["password"]) ) {
 		$user = $GLOBALS["connection"]->real_escape_string($_POST["user"]);
 		$password = $GLOBALS["connection"]->real_escape_string($_POST["password"]);
 		
-		$query = "SELECT count(id) AS count FROM ql_players WHERE name='".$user."' AND password='".$password."'";
+		$query = "SELECT id FROM ql_players WHERE name='".$user."' AND password='".$password."'";
 		$res = query($query);
 		$row = $res->fetch_assoc();
-		if ( $row["count"] == 1 ) $logged = TRUE;
+		if ( $row ) {
+			$logged = TRUE;
+			$player_id = $row["id"];
+		}
 		else {
 			paragraph("Le credenziali che hai inserito non sono valide.");
 			$user = "";
 			$password = "";
 		}
 	}
-	if ( $logged ) paragraph("Sei stato riconosciuto come un giocatore valido, ".bold($user).".");
+	if ( $logged ) paragraph("Sei stato riconosciuto come un giocatore valido, ".bold($user)." (id=".$player_id.").");
+	
+	if ( $logged ) {
+		// TODO: Processare le azioni
+	}
 
 	// Descrizione del tempo di gioco
 	$phase = $row["phase"];
@@ -92,14 +100,39 @@ else {
 	while ( $row = $res->fetch_assoc() ) {
 		$status = "";
 		if ( $row["death"] == 0 ) $status = "Vivo";
-		else $status = "Morto il giorno ".$row["death"];
+		else $status = "Morto mediamente il giorno ".$row["death"];
 		$role = "";
 		if ( $row["death"] != 0 ) $role = $row["role"];
 		$tabella[] = array( $row["name"], $status, $role );
 	}
 	paragraph(return_table($tabella));
 	
+	// Status personale
+	if ( $logged ) {
+		make_title("Status personale",2);
+		
+		$query = "SELECT r.name AS role, w.probability AS probability
+			FROM ql_waves AS w INNER JOIN ql_roles AS r ON (w.role_id=r.id) WHERE player_id=".$player_id." ORDER BY r.id";
+		$res = query($query);
+		$list = array();
+		while ( $row = $res->fetch_assoc() ) {
+			$list[] = $row["role"]." con probabilità ".$row["probability"];
+		}
+		make_list($list);
+	}
 	
+	// Log personale
+	if ( $logged ) {
+		make_title("Log personale",2);
+		
+		$query = "SELECT * FROM ql_logs WHERE player_id=".$player_id." ORDER BY day DESC, id DESC";
+		$res = query($query);
+		$list = array();
+		while ( $row = $res->fetch_assoc() ) {
+			$list[] = "[Giorno ".$row["day"]."] ".$row["content"];
+		}
+		make_list($list);
+	}
 }
 
 ?>
