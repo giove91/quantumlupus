@@ -19,6 +19,13 @@ if ( !($row = $res->fetch_assoc()) ) {
 }
 else {
 	
+	$phase = $row["phase"];
+	$phase_text = "";
+	$day = $row["day"];
+	if ( $phase == 1 ) $phase_text = "Giorno";
+	else $phase_text = "Notte";
+	
+	
 	// Controllo del login
 	$logged = FALSE;
 	$user = "";
@@ -48,12 +55,6 @@ else {
 	}
 
 	// Descrizione del tempo di gioco
-	$phase = $row["phase"];
-	$phase_text = "";
-	$day = $row["day"];
-	if ( $phase == 1 ) $phase_text = "Giorno";
-	else $phase_text = "Notte";
-	
 	paragraph(bold("Tempo di gioco: ").$phase_text." ".$day);
 	
 	// Autenticazione
