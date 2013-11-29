@@ -10,6 +10,15 @@ state = None
 roles = [None,'Morto','Contadino','Veggente','Guardia','Lupo alfa','Lupo beta','Lupo gamma','Lupo delta','Lupo epsilon']
 
 
+# funzione che produce una sequenza casuale
+def rand(N,L):
+    r = [random.randint(0,N-L) for i in range(L)]
+    r.sort()
+    r = [r[i]+i for i in range(L)]
+    random.shuffle(r)
+    return r
+
+
 # funzione che calcola il successivo di una sequenza
 def next(N,V):
     for i in reversed(range(len(V))):
@@ -118,7 +127,7 @@ class QuantumState:
         result = (result[target][0] if result[cast][0] == 3 else result[random.randint(0,self.N-1)][0] ) > 4
         nq = set()
         for s in self.quantum:
-            if s[cast][0] != 3 or result == (s[target][0] > 4):
+            if s[cast][0] != 3 or s[cast][1] != 0 or result == (s[target][0] > 4):
                 nq.add(s)
         self.quantum = nq
         self.waves = None
@@ -163,6 +172,17 @@ class QuantumState:
             return True
         return False
 
+    def filter(self,k):
+        if isinstance(k,float):
+            nq = set()
+            for s in self.quantum:
+                if random.randint(0,100000) <= 100000*k:
+                    nq.add(s)
+        else:
+            nq = random.sample(list(self.quantum),k)
+        self.quantum = set(nq)
+        self.waves = None
+
     def add(self,V,G,L):
         # aggiunge uno stato iniziale
         s = [(2,0) for i in range(self.N)]
@@ -174,16 +194,22 @@ class QuantumState:
             s[L[i]] = (5+i,0)
         self.quantum.add(tuple(s))
 
-    def __init__(self,N,NV,NG,NL):
+    def __init__(self,N,NV,NG,NL,k=2.0):
         # inizializzo con un certo numero di giocatori per ruolo
         self.N = N
         self.NL = NL
         self.quantum = set()
         self.waves = None
-        V = [i for i in range(NV+NG+NL)]
-        self.add(V[0:NV],V[NV:NV+NG],V[NV+NG:])
-        while (next(N,V)):
+        if isinstance(k,float):
+            V = [i for i in range(NV+NG+NL)]
             self.add(V[0:NV],V[NV:NV+NG],V[NV+NG:])
+            while (next(N,V)):
+                if random.randint(0,100000) <= 100000*k:
+                    self.add(V[0:NV],V[NV:NV+NG],V[NV+NG:])
+        else:
+            while (len(self) < k):
+                V = rand(N,NV+NG+NL)
+                self.add(V[0:NV],V[NV:NV+NG],V[NV+NG:])
 
 
 # classe che si interfaccia con il database
@@ -191,7 +217,7 @@ class DataBase:
     def get_player_name(self,id):
         # guarda il nome nella tabella players
         return self.players.select(self.players.c.id==id+1).execute().fetchall()[0][1]
-    
+
     def initial_state(self):
         # restituisce lo stato iniziale
         NC = self.game.select(self.game.c.role_id==2).execute().fetchall()[0][1]
@@ -284,14 +310,22 @@ class DataBase:
         self.roles.delete().execute()
         self.game.delete().execute()
         self.logs.delete().execute()
-        print "Numero di giocatori: ",
-        N = int(sys.stdin.readline())
+        print "Attesa connessioni (premere invio per cominciare la partita)...",
+        sys.stdin.readline()
+        db.time.insert().execute(day=1,phase=1)
+        N = len(self.players.select().execute().fetchall())
         print "Numero di veggenti: ",
         NV = int(sys.stdin.readline())
         print "Numero di guardie: ",
         NG = int(sys.stdin.readline())
         print "Numero di lupi: ",
         NL = int(sys.stdin.readline())
+        print "Stati iniziali (vuoto per tutti gli stati)",
+        k = sys.stdin.readline()[:-1]
+        if k == '':
+            k = 2.0
+        else:
+            k = eval(k)
         NC = N - NV - NG - NL
         self.game.insert().execute(role_id=2,num=NC)
         self.game.insert().execute(role_id=3,num=NV)
@@ -303,19 +337,8 @@ class DataBase:
         for i in range(N):
         	for j in range(1,6):
         		self.waves.insert().execute(player_id=i+1,role_id=j,probability=0.0)
-        for i in range(N):
-            print "Giocatore %d: " % i
-            print "        nome: ",
-            nome = sys.stdin.readline()[:-1]
-            if nome == '':
-            	nome = LOGS().names[i]
-            print "    password: ",
-            pwd = sys.stdin.readline()[:-1]
-            if pwd == '':
-            	pwd = 'prova%d' % i
-            self.players.insert().execute(id=i+1, name=nome, password=pwd, death=0)
         global state
-        state = self.initial_state()
+        state = QuantumState(N,NV,NG,NL,k)
         self.update_waves()
 
     def __init__(self,url):
