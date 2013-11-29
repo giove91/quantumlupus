@@ -67,13 +67,13 @@ if ( !($row = $res->fetch_assoc()) ) {
 		}	
 	}
 	
-	
-	// Registrazione
-	start_form("index.php","POST");
-	paragraph(bold("Registrazione: ")."Username ".text_input("r_user",10,$user)." Password ".password_input("r_password",10,$password));
-	paragraph(submit_input("Invia"));
-	end_form();
-	
+	if ( !$registered ) {
+		// Registrazione
+		start_form("index.php","POST");
+		paragraph(bold("Registrazione: ")."Username ".text_input("r_user",10,$user)." Password ".password_input("r_password",10,$password));
+		paragraph(submit_input("Invia"));
+		end_form();
+	}
 }
 else {
 	
