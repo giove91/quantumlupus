@@ -205,8 +205,9 @@ class DataBase:
         # aggiorna la tabella waves e death di players
         for i in range(state.N):
             for j in range(1,6):
-                self.waves.update(self.waves.c.player_id==i,self.c.waves.role_id==j).execute(probability=state[i][j])
-                self.players.update(self.players.c.id==i).execute(death=(0 if state[i][1] < len(state) else 10*state[i][0]/state[i][1]))
+            	p = state[i][j]/float(len(state))
+                self.waves.update().where(self.waves.c.player_id==i+1).where(self.waves.c.role_id==j).execute(probability=p)
+                self.players.update(self.players.c.id==i+1).execute(death=(0 if state[i][1] < len(state) else 10*state[i][0]/state[i][1]))
 
     def get_actions(self):
         # restituisce le azioni inserite nel giorno di oggi
@@ -217,10 +218,10 @@ class DataBase:
         # controlla se tutti hanno fatto le loro azioni
         for i in range(state.N):
             if state[i][1] < len(state):
-                if phase and len(self.actions.select(self.actions.c.player_id==i+1,self.actions.c.type==1,self.actions.c.day==day).execute().fetchall()) == 0:
+                if phase and len(self.actions.select().where(self.actions.c.player_id==i+1).where(self.actions.c.type==1).where(self.actions.c.day==day).execute().fetchall()) == 0:
                     return False
                 for j in range(1,4):
-                    if not phase and state[i][j+2] > 0 and len(self.actions.select(self.actions.c.player_id==i+1,self.actions.c.type==j%3+2,self.actions.c.day==day).execute().fetchall()) == 0:
+                    if not phase and state[i][j+2] > 0 and len(self.actions.select().where(self.actions.c.player_id==i+1).where(self.actions.c.type==j%3+2).where(self.actions.c.day==day).execute().fetchall()) == 0:
                         return False
         return True
 
@@ -264,7 +265,7 @@ class DataBase:
             if a[1] == 3 and not done[a[0]]:
                 self.logs.insert().execute(player_id=a[0],day=day,content='Hai scrutato %s ed e\' risultato un %s.' % (self.get_player_name(a[2]), ('lupo' if state.seer(a[0],a[2]) else 'villico')) )
 
-    def clear():
+    def clear(self):
         # pulisco il database e chiedo come ricostruirlo
         self.time.delete().execute()
         self.players.delete().execute()
@@ -273,35 +274,44 @@ class DataBase:
         self.roles.delete().execute()
         self.game.delete().execute()
         self.logs.delete().execute()
-        print "Numero di giocatori: "
-        N = int(sys.stdin.read())
-        print "Numero di veggenti: "
-        NV = int(sys.stdin.read())
-        print "Numero di guardie: "
-        NG = int(sys.stdin.read())
-        print "Numero di lupi: "
-        NL = int(sys.stdin.read())
+        print "Numero di giocatori: ",
+        N = int(sys.stdin.readline())
+        print "Numero di veggenti: ",
+        NV = int(sys.stdin.readline())
+        print "Numero di guardie: ",
+        NG = int(sys.stdin.readline())
+        print "Numero di lupi: ",
+        NL = int(sys.stdin.readline())
         NC = N - NV - NG - NL
         self.game.insert().execute(role_id=2,num=NC)
         self.game.insert().execute(role_id=3,num=NV)
         self.game.insert().execute(role_id=4,num=NG)
         self.game.insert().execute(role_id=5,num=NL)
         for i in range(1,5):
-            self.roles.insert().execute(name=roles[i])
-        self.roles.insert().execute(name='Lupo')
+            self.roles.insert().execute(id=i,name=roles[i])
+        self.roles.insert().execute(id=5,name='Lupo')
+        for i in range(N):
+        	for j in range(1,6):
+        		self.waves.insert().execute(player_id=i+1,role_id=j,probability=0.0)
         for i in range(N):
             print "Giocatore %d: " % i
-            print "        nome: "
-            nome = sys.stdin.read()
-            print "    password: "
-            pwd = sys.stdin.read()
-            self.players.insert().execute(name=nome, password=pwd, death=0)
+            print "        nome: ",
+            nome = sys.stdin.readline()[:-1]
+            if nome == '':
+            	nome = LOGS().names[i]
+            print "    password: ",
+            pwd = sys.stdin.readline()[:-1]
+            if pwd == '':
+            	pwd = 'prova%d' % i
+            self.players.insert().execute(id=i+1, name=nome, password=pwd, death=0)
+        global state
+        state = self.initial_state()
         self.update_waves()
 
     def __init__(self,url):
         # inizializzo il db
         self.db = create_engine(url)
-        self.md = MetaData(db)
+        self.md = MetaData(self.db)
         self.time    = Table('ql_time',    self.md, autoload=True)
         self.players = Table('ql_players', self.md, autoload=True)
         self.waves   = Table('ql_waves',   self.md, autoload=True)
@@ -330,7 +340,6 @@ if __name__ == '__main__':
         db.clear()
     else:
         db.logs.clear()
-    state = db.initial_state()
 
     for x in range(1,state.N):
         day = x
