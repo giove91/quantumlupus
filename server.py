@@ -26,8 +26,52 @@ def next(N,V):
     return False
 
 
+#FUNZIONI PER IL DEBUG
+def check(a):
+    for i in a:
+        if i[0] == i[2]:
+            return False
+    return True
+
+def randact(N):
+    a = [[0,0,0]]
+    while not check(a):
+        a = []
+        for k in range(2,5):
+            a += [[i,k,random.randint(0,N-1)] for i in range(N)]
+    return a
+
+def setup():
+    global state
+    global day
+    day = 1
+    state = QuantumState(10,1,1,2)
+    print state
+
+def donight():
+    assert(day>0)
+    a = randact(state.N)
+    DataBase.check_seerings(LOGS(),a)
+    print state
+    print "e ora si morde!!"
+    state.bite(a)
+    print state
+
+def doday():
+    global day
+    day = day+1
+    a = random.randint(1,state.N-1)
+    print 'Il giocatore %d e\' stato linciato, rivelandosi un %s.\n' % (a, ('lupo' if state.lynch(a) else 'villico'))
+    print state
+
 # classe che rappresenta uno stato quantistico
 class QuantumState:
+    def __repr__(self):
+        s = '%d \t(day %d)' % (len(self), day)
+        for i in range(self.N):
+            s += '\n%s' % str(self[i])
+        return s
+    
     def __len__(self):
         # restituisce il numero di stati rimasti
         return len(self.quantum)
@@ -36,16 +80,18 @@ class QuantumState:
         # restituisce l'onda di probabilita' per i
         if self.waves is not None:
             return self.waves[i]
-        self.waves[[0, 0, 0, 0, 0] for i in range(self.N)]
-        for s in self.quantum():
+        self.waves = [[0, 0, 0, 0, 0, 0] for j in range(self.N)]
+        for s in self.quantum:
             for j in range(self.N):
-                self.waves[j][min(s[j][0],5)-1] += 1
+                self.waves[j][min(s[j][0],5)] += 1
                 if s[j][1] > 0:
-                    self.waves[j][0] += 1
+                    self.waves[j][1] += 1
+                    self.waves[j][0] += s[j][1]
         return self.waves[i]
 
     def lynch(self,kill):
         # lincia la persona kill
+        assert(self[kill][1] != len(self))
         nq = []
         for s in self.quantum:
             if s[kill][1] == 0:
@@ -61,7 +107,7 @@ class QuantumState:
         self.waves = None
         return result[kill][0] > 4
 
-    def seer(self,cast target):
+    def seer(self,cast,target):
         # esegue uno scrutamento
         result = random.choice(list(self.quantum))[target][0] > 4
         nq = set()
@@ -89,7 +135,9 @@ class QuantumState:
                 if a[1] == 4 and s[a[0]] == (4,0) and not done[a[0]]:
                     protected += [a[2]]
                     done[a[1]] = True
-            if state[bitten][0] < 5:
+            if bitten < 0:
+                nq.add(s)
+            elif s[bitten][0] < 5:
                 ns = list(s)
                 if bitten not in protected:
                     ns[bitten] = (ns[bitten][0],day)
@@ -103,9 +151,9 @@ class QuantumState:
         deadwolves = 0
         goodliving = 0
         for i in range(self.N):
-            if self[i][0] == self[i][4] == len(self):
+            if self[i][1] == self[i][5] == len(self):
                 deadwolves += 1
-            goodliving += max(len(self)-self[i][0]-self[i][4],0)
+            goodliving += max(len(self)-self[i][1]-self[i][5],0)
         if deadwolves == self.NL or goodliving == 0:
             # la partita e' finita.
             self.quantum=[random.choice(list(self.quantum))]
@@ -114,14 +162,14 @@ class QuantumState:
 
     def add(self,V,G,L):
         # aggiunge uno stato iniziale
-        roles = [(2,0) for i in range(self.N)]
+        s = [(2,0) for i in range(self.N)]
         for i in V:
-            roles[i] = (3,0)
+            s[i] = (3,0)
         for i in G:
-            roles[i] = (4,0)
+            s[i] = (4,0)
         for i in range(len(L)):
-            roles[L[i]] = (5+i,0)
-        self.quantum.add(tuple(roles))
+            s[L[i]] = (5+i,0)
+        self.quantum.add(tuple(s))
 
     def __init__(self,N,NV,NG,NL):
         # inizializzo con un certo numero di giocatori per ruolo
@@ -160,9 +208,9 @@ class DataBase:
         for i in range(self.N):
             if state.quantum[0][i][0] > 4 and state.quantum[0][i][1] == 0:
                 result = True
-            logtext += '%s (%s)\n' % (get_player_name(i),role[state.quantum[0][i][0]])
+            logtext += '%s (%s)\n' % (self.get_player_name(i),role[state.quantum[0][i][0]])
         logtext = 'La partita e\' finita e hanno vinto i %s!\n Hanno giocato:\n' % ('lupi' if result else 'villici') + logtext
-`       self.logs.insert().execute(0,day,logtext)
+        self.logs.insert().execute(0,day,logtext)
 
     def vote(self,votes):
         # esamina i voti, lincia e compila il log
@@ -177,22 +225,22 @@ class DataBase:
             if len(nvot[i]) == maxv:
                 winners += i
         kill = choice(winners)
-        logtext = 'Il giocatore %s e\' stato linciato, rivelandosi un %s.\r\n' % (get_player_name(kill), ('lupo' if state.lynch(kill) else 'villico'))
+        logtext = 'Il giocatore %s e\' stato linciato, rivelandosi un %s.\r\n' % (self.get_player_name(kill), ('lupo' if state.lynch(kill) else 'villico'))
         for i in range(self.N):
             if len(nvot(i)) > 0:
-                logtext += 'Voti per %s:\r\n' % get_player_name(i)
+                logtext += 'Voti per %s:\r\n' % self.get_player_name(i)
                 for v in nvot(i):
-                    logtext += '\t%s\r\n' % get_player_name(v)
+                    logtext += '\t%s\r\n' % self.get_player_name(v)
                 logtext += 'TOT: %d\r\n' % len(nvot(i))
         self.logs.insert().execute(0,day,logtext)
 
     def check_seerings(self,actions):
         # esegue in ordine casuale gli scrutamenti
         random.shuffle(actions)
-        done = [False for i in range(self.N)]
+        done = [False for i in range(state.N)]
         for a in actions:
             if a[1] == 3 and not done[a[0]]:
-                self.logs.insert().execute(a[0],day,'Hai scrutato %s ed e\' risultato un %s.' % (get_player_name(a[2]), ('lupo' if state.seer(a[0],a[2]) else 'villico')) )
+                self.logs.insert().execute(a[0],day,'Hai scrutato %s ed e\' risultato un %s.' % (self.get_player_name(a[2]), ('lupo' if state.seer(a[0],a[2]) else 'villico')) )
 
     def clear():
         # pulisco il resto del database e chiedo come ricostruirlo
@@ -244,6 +292,15 @@ class DataBase:
             xri.execute(name=roles[i])
         # cancello la tabella time, come indicatore di "server not running"
         self.time.delete()
+
+# CLASSE FAKE
+class LOGS(DataBase):
+    def insert(self):
+        return self
+    def execute(self,id,day,txt):
+        print "LOG (day %d): %d -- %s" % (day, id, txt)
+    def __init__(self):
+        self.logs = self
 
 
 if __name__ == '__main__':
