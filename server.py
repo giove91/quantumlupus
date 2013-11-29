@@ -367,7 +367,7 @@ if __name__ == '__main__':
                 db.update_waves()
                 break
         print state
-        print state.quantum
+        # print state.quantum
         # notte!
         db.time.delete().execute()
         db.time.insert().execute(day=day,phase=2)
@@ -382,9 +382,9 @@ if __name__ == '__main__':
             db.update_waves()
             break
         print state
-        print state.quantum
+        # print state.quantum
     print state
-    print state.quantum
+    # print state.quantum
 
 # logs.insert().execute(content='nuovo contenuto')
 # logs.delete(logs.c.player_id==1).execute()
