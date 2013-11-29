@@ -238,7 +238,7 @@ class DataBase:
     def get_actions(self):
         # restituisce le azioni inserite nel giorno di oggi
         r = self.actions.select(self.actions.c.day==day).execute().fetchall()
-        return reversed([[a[1]-1,a[2],a[3]-1] for a in r])
+        return list(reversed([[a[1]-1,a[2],a[3]-1] for a in r]))
 
     def turn_done(self,phase):
         # controlla se tutti hanno fatto le loro azioni
