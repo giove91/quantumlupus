@@ -134,7 +134,7 @@ else {
 	$tabella = array();
 	while ( $row = $res->fetch_assoc() ) {
 		$status = "";
-		if ( $row["death"] == 0 ) $status = "Vivo con probabilità ".( (int)(100.0 - 100.0*$row["death_probability"]) );
+		if ( $row["death"] == 0 ) $status = "vivo con probabilità ".( (int)(100.0 - 100.0*$row["death_probability"])."%" );
 		else $status = "Morto mediamente il giorno ".sprintf("%.1lf",(double)($row["death"]));
 		$role = "";
 		if ( $row["death"] != 0 ) {
