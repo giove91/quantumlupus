@@ -238,7 +238,7 @@ class DataBase:
     def get_actions(self):
         # restituisce le azioni inserite nel giorno di oggi
         r = self.actions.select(self.actions.c.day==day).execute().fetchall()
-        return [[a[1]-1,a[2],a[3]-1] for a in r]
+        return reversed([[a[1]-1,a[2],a[3]-1] for a in r])
 
     def turn_done(self,phase):
         # controlla se tutti hanno fatto le loro azioni
@@ -301,6 +301,12 @@ class DataBase:
             if a[1] == 3 and not done[a[0]]:
                 self.logs.insert().execute(player_id=a[0]+1,day=day,content='Hai scrutato %s ed e\' risultato un %s.' % (self.get_player_name(a[2]), ('lupo' if state.seer(a[0],a[2]) else 'villico')) )
                 done[a[0]] = True
+
+    def log_actions(self, actions):
+        done = [[False,False] for i in range(state.N)]
+        for a in actions:
+            if (a[1] == 2 or a[1] == 4) and not done[a[0]][a[1]/2-1]:
+                self.logs.insert().execute(player_id=a[0]+1,day=day,content='Hai %s %s.' % (('sbranato' if a[1] == 2 else 'protetto'), self.get_player_name(a[2])) )
 
     def clear(self):
         # pulisco il database e chiedo come ricostruirlo
@@ -386,7 +392,9 @@ if __name__ == '__main__':
             while not db.turn_done(True) and counter < 150:
                 time.sleep(2)
                 counter += 1
-            db.vote(db.get_actions())
+            a = db.get_actions()
+            db.log_actions(a)
+            db.vote(a)
             db.update_waves()
             if state.finished():
                 db.end_game()
@@ -402,6 +410,7 @@ if __name__ == '__main__':
             time.sleep(2)
             counter += 1
         a = db.get_actions()
+        db.log_actions(a)
         db.check_seerings(a)
         state.bite(a)
         db.update_waves()
