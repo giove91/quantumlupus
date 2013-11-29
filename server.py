@@ -8,7 +8,7 @@ import random
 # giorno e stato sono variabili globali
 day = 0
 state = None
-roles = [None,'Morto','Contadino','Veggente','Guardia','Lupo']
+roles = [None,'Morto','Contadino','Veggente','Guardia','Lupo alfa','Lupo beta','Lupo gamma','Lupo delta','Lupo epsilon']
 
 
 # funzione che calcola il successivo di una sequenza
@@ -26,50 +26,56 @@ def next(N,V):
     return False
 
 
-#FUNZIONI PER IL DEBUG
-def check(a):
-    for i in a:
-        if i[0] == i[2]:
-            return False
-    return True
+# DEBUG
+class DEBUG():
+    def randiff(self,N,i):
+        r = i
+        while r == i:
+            r = random.randint(0,N-1)
+        return r
 
-def randact(N):
-    a = [[0,0,0]]
-    while not check(a):
+    def randact(self,N):
         a = []
-        for k in range(2,5):
-            a += [[i,k,random.randint(0,N-1)] for i in range(N)]
-    return a
+        for k in range(1,5):
+            a += [[i,k,self.randiff(N,i)] for i in range(N)]
+        return a
 
-def setup():
-    global state
-    global day
-    day = 1
-    state = QuantumState(10,1,1,2)
-    print state
+    def setup(self):
+        global state
+        global day
+        day = 1
+        state = QuantumState(10,1,1,2)
+        print state
 
-def donight():
-    assert(day>0)
-    a = randact(state.N)
-    DataBase.check_seerings(LOGS(),a)
-    print state
-    print "e ora si morde!!"
-    state.bite(a)
-    print state
+    def doday(self):
+        global day
+        assert(day>0)
+        a = self.randact(state.N)
+        DataBase.check_seerings(LOGS(),a)
+        state.bite(a)
+        print state
+        if state.finished():
+            return
+        day = day+1
+        DataBase.vote(LOGS(),a)
+        print state
 
-def doday():
-    global day
-    day = day+1
-    a = random.randint(1,state.N-1)
-    print 'Il giocatore %d e\' stato linciato, rivelandosi un %s.\n' % (a, ('lupo' if state.lynch(a) else 'villico'))
-    print state
+    def __call__(self):
+        self.setup()
+        while not state.finished():
+            self.doday()
+        DataBase.end_game(LOGS())
+
+if __name__ != '__main__':
+    d = DEBUG()
+
 
 # classe che rappresenta uno stato quantistico
 class QuantumState:
     def __repr__(self):
         s = '%d \t(day %d)' % (len(self), day)
         for i in range(self.N):
-            s += '\n%s' % str(self[i])
+            s += '\n%s' % '\t'.join([str((10*self[i][0]/self[i][1])/10.0) if self[i][1] > 0 else '0'] + [str(100*x/len(self))+'%' for x in self[i][1:]])
         return s
     
     def __len__(self):
@@ -90,7 +96,7 @@ class QuantumState:
         return self.waves[i]
 
     def lynch(self,kill):
-        # lincia la persona kill
+        # lincia la persona kill, che non deve essere gia' morta
         assert(self[kill][1] != len(self))
         nq = []
         for s in self.quantum:
@@ -109,7 +115,8 @@ class QuantumState:
 
     def seer(self,cast,target):
         # esegue uno scrutamento
-        result = random.choice(list(self.quantum))[target][0] > 4
+        result = random.choice(list(self.quantum))
+        result = (result[target][0] if result[cast][0] == 3 else result[random.randint(0,self.N-1)][0] ) > 4
         nq = set()
         for s in self.quantum:
             if s[cast][0] != 3 or result == (s[target][0] > 4):
@@ -119,7 +126,7 @@ class QuantumState:
         return result
 
     def bite(self,actions):
-        # filtra per morsi e guardiamenti
+        # esegue morsi e guardiamenti
         nq = set()
         for s in self.quantum:
             alphawolf = -1
@@ -135,14 +142,10 @@ class QuantumState:
                 if a[1] == 4 and s[a[0]] == (4,0) and not done[a[0]]:
                     protected += [a[2]]
                     done[a[1]] = True
-            if bitten < 0:
-                nq.add(s)
-            elif s[bitten][0] < 5:
-                ns = list(s)
-                if bitten not in protected:
-                    ns[bitten] = (ns[bitten][0],day)
-                nq.add(tuple(ns))
-        assert(len(nq)>0) #verificare l'asserzione
+            ns = list(s)
+            if bitten >= 0 and bitten not in protected:
+                ns[bitten] = (ns[bitten][0],day)
+            nq.add(tuple(ns))
         self.quantum = nq
         self.waves = None
 
@@ -156,9 +159,10 @@ class QuantumState:
             goodliving += max(len(self)-self[i][1]-self[i][5],0)
         if deadwolves == self.NL or goodliving == 0:
             # la partita e' finita.
-            self.quantum=[random.choice(list(self.quantum))]
-            return self.quantum
-        return None
+            self.quantum = [random.choice(list(self.quantum))]
+            self.waves = None
+            return True
+        return False
 
     def add(self,V,G,L):
         # aggiunge uno stato iniziale
@@ -184,7 +188,6 @@ class QuantumState:
 
 
 # classe che si interfaccia con il database
-# REM: death nella tabella: giorno medio di morte
 class DataBase:
     def get_player_name(self,id):
         # guarda il nome nella tabella players
@@ -205,34 +208,34 @@ class DataBase:
     def end_game(self):
         # logga le informazioni sul fine partita
         result = False
-        for i in range(self.N):
+        logtext = ''
+        for i in range(state.N):
             if state.quantum[0][i][0] > 4 and state.quantum[0][i][1] == 0:
                 result = True
-            logtext += '%s (%s)\n' % (self.get_player_name(i),role[state.quantum[0][i][0]])
-        logtext = 'La partita e\' finita e hanno vinto i %s!\n Hanno giocato:\n' % ('lupi' if result else 'villici') + logtext
-        self.logs.insert().execute(0,day,logtext)
+        self.logs.insert().execute(0,day,'La partita e\' finita e hanno vinto i %s!!  Hanno giocato:' % ('lupi' if result else 'villici'))
+        for i in range(state.N):
+            self.logs.insert().execute(0,day,'%s (%s)' % (self.get_player_name(i),roles[state.quantum[0][i][0]]))
 
     def vote(self,votes):
         # esamina i voti, lincia e compila il log
-        done = [False for i in range(self.N)]
-        nvot = [[] for i in range(self.N)]
+        done = [False for i in range(state.N)]
+        nvot = [[] for i in range(state.N)]
         for v in votes:
-            if v[1] == 1 and not done[v[0]]:
+            if v[1] == 1 and not done[v[0]] and state[v[2]][1] < len(state):
                 nvot[v[2]].append(v[0])
         winners = []
         maxv = max([len(i) for i in nvot])
-        for i in range(self.N):
+        for i in range(state.N):
             if len(nvot[i]) == maxv:
-                winners += i
-        kill = choice(winners)
-        logtext = 'Il giocatore %s e\' stato linciato, rivelandosi un %s.\r\n' % (self.get_player_name(kill), ('lupo' if state.lynch(kill) else 'villico'))
-        for i in range(self.N):
-            if len(nvot(i)) > 0:
-                logtext += 'Voti per %s:\r\n' % self.get_player_name(i)
-                for v in nvot(i):
-                    logtext += '\t%s\r\n' % self.get_player_name(v)
-                logtext += 'TOT: %d\r\n' % len(nvot(i))
-        self.logs.insert().execute(0,day,logtext)
+                winners += [i]
+        kill = random.choice(winners)
+        self.logs.insert().execute(0,day,'Il giocatore %s e\' stato linciato, rivelandosi un %s.' % (self.get_player_name(kill), ('lupo' if state.lynch(kill) else 'villico')))
+        for i in range(state.N):
+            if len(nvot[i]) > 0:
+                logtext = 'Voti per %s  (TOT %d):  ' % (self.get_player_name(i),len(nvot[i]))
+                for v in nvot[i]:
+                    logtext += ' %s' % self.get_player_name(v)
+                self.logs.insert().execute(0,day,logtext)
 
     def check_seerings(self,actions):
         # esegue in ordine casuale gli scrutamenti
@@ -288,19 +291,24 @@ class DataBase:
         # ricostruisco la tabella ql_roles
         self.roles.delete()
         xri = self.roles.insert()
-        for i in range(1,6):
+        for i in range(1,5):
             xri.execute(name=roles[i])
+        xri.execute(name='Lupo')
         # cancello la tabella time, come indicatore di "server not running"
         self.time.delete()
 
-# CLASSE FAKE
+# DEBUG
 class LOGS(DataBase):
+    def get_player_name(self,id):
+        # guarda il nome nella tabella players
+        return self.names[id]
     def insert(self):
         return self
     def execute(self,id,day,txt):
         print "LOG (day %d): %d -- %s" % (day, id, txt)
     def __init__(self):
         self.logs = self
+        self.names = ['Ammalia','Brumo','Carna','Darlo','Elica','Fascio','Gorgo','Hanno','Iene','Lucca','Marcio','Nicolla']
 
 
 if __name__ == '__main__':
@@ -316,6 +324,9 @@ if __name__ == '__main__':
             #xti.execute()
             db.wait(True)
             db.vote(db.get_actions())
+            if state.finished():
+                db.end_game()
+                break
         # notte!
         #xti = time.insert(day=day,phase=2)
         #xti.execute()
