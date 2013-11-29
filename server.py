@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 
 from sqlalchemy import *
-import dburl, sys
-import random
+import dburl, sys, random, time
 
 
 # giorno e stato sono variabili globali
@@ -191,19 +190,39 @@ class QuantumState:
 class DataBase:
     def get_player_name(self,id):
         # guarda il nome nella tabella players
-        return str(id)
+        return self.players.select(self.players.c.id==id+1).execute().fetchall()[0][1]
     
     def initial_state(self):
         # restituisce lo stato iniziale
+        NC = self.game.select(self.game.c.role_id==2).execute().fetchall()[0][1]
+        NV = self.game.select(self.game.c.role_id==3).execute().fetchall()[0][1]
+        NG = self.game.select(self.game.c.role_id==4).execute().fetchall()[0][1]
+        NL = self.game.select(self.game.c.role_id==5).execute().fetchall()[0][1]
+        N = NC + NV + NG + NL
         return QuantumState(N,NV,NG,NL)
     
-    def wait(self,phase):
-        # aspetta che tutti facciano le loro azioni
-        pass
+    def update_waves(self):
+        # aggiorna la tabella waves e death di players
+        for i in range(state.N):
+            for j in range(1,6):
+                self.waves.update(self.waves.c.player_id==i,self.c.waves.role_id==j).execute(probability=state[i][j])
+                self.players.update(self.players.c.id==i).execute(death=(0 if state[i][1] < len(state) else 10*state[i][0]/state[i][1]))
 
     def get_actions(self):
         # restituisce le azioni inserite nel giorno di oggi
-        pass
+        r = self.actions.select(self.actions.c.day==day).execute().fetchall()
+        return [[a[1]-1,a[2],a[3]-1] for a in r]
+
+    def turn_done(self,phase):
+        # controlla se tutti hanno fatto le loro azioni
+        for i in range(state.N):
+            if state[i][1] < len(state):
+                if phase and len(self.actions.select(self.actions.c.player_id==i+1,self.actions.c.type==1,self.actions.c.day==day).execute().fetchall()) == 0:
+                    return False
+                for j in range(1,4):
+                    if not phase and state[i][j+2] > 0 and len(self.actions.select(self.actions.c.player_id==i+1,self.actions.c.type==j%3+2,self.actions.c.day==day).execute().fetchall()) == 0:
+                        return False
+        return True
 
     def end_game(self):
         # logga le informazioni sul fine partita
@@ -212,9 +231,9 @@ class DataBase:
         for i in range(state.N):
             if state.quantum[0][i][0] > 4 and state.quantum[0][i][1] == 0:
                 result = True
-        self.logs.insert().execute(0,day,'La partita e\' finita e hanno vinto i %s!!  Hanno giocato:' % ('lupi' if result else 'villici'))
+        self.logs.insert().execute(player_id=0,day=day,content='La partita e\' finita e hanno vinto i %s!!  Hanno giocato:' % ('lupi' if result else 'villici'))
         for i in range(state.N):
-            self.logs.insert().execute(0,day,'%s (%s)' % (self.get_player_name(i),roles[state.quantum[0][i][0]]))
+            self.logs.insert().execute(player_id=0,day=day,content='%s (%s)' % (self.get_player_name(i),roles[state.quantum[0][i][0]]))
 
     def vote(self,votes):
         # esamina i voti, lincia e compila il log
@@ -229,13 +248,13 @@ class DataBase:
             if len(nvot[i]) == maxv:
                 winners += [i]
         kill = random.choice(winners)
-        self.logs.insert().execute(0,day,'Il giocatore %s e\' stato linciato, rivelandosi un %s.' % (self.get_player_name(kill), ('lupo' if state.lynch(kill) else 'villico')))
+        self.logs.insert().execute(player_id=0,day=day,content='Il giocatore %s e\' stato linciato, rivelandosi un %s.' % (self.get_player_name(kill), ('lupo' if state.lynch(kill) else 'villico')))
         for i in range(state.N):
             if len(nvot[i]) > 0:
                 logtext = 'Voti per %s  (TOT %d):  ' % (self.get_player_name(i),len(nvot[i]))
                 for v in nvot[i]:
                     logtext += ' %s' % self.get_player_name(v)
-                self.logs.insert().execute(0,day,logtext)
+                self.logs.insert().execute(player_id=0,day=day,content=logtext)
 
     def check_seerings(self,actions):
         # esegue in ordine casuale gli scrutamenti
@@ -243,15 +262,17 @@ class DataBase:
         done = [False for i in range(state.N)]
         for a in actions:
             if a[1] == 3 and not done[a[0]]:
-                self.logs.insert().execute(a[0],day,'Hai scrutato %s ed e\' risultato un %s.' % (self.get_player_name(a[2]), ('lupo' if state.seer(a[0],a[2]) else 'villico')) )
+                self.logs.insert().execute(player_id=a[0],day=day,content='Hai scrutato %s ed e\' risultato un %s.' % (self.get_player_name(a[2]), ('lupo' if state.seer(a[0],a[2]) else 'villico')) )
 
     def clear():
-        # pulisco il resto del database e chiedo come ricostruirlo
-        self.players.delete()
-        self.waves.delete()
-        self.actions.delete()
-        self.game.delete()
-        self.logs.delete()
+        # pulisco il database e chiedo come ricostruirlo
+        self.time.delete().execute()
+        self.players.delete().execute()
+        self.waves.delete().execute()
+        self.actions.delete().execute()
+        self.roles.delete().execute()
+        self.game.delete().execute()
+        self.logs.delete().execute()
         print "Numero di giocatori: "
         N = int(sys.stdin.read())
         print "Numero di veggenti: "
@@ -261,47 +282,33 @@ class DataBase:
         print "Numero di lupi: "
         NL = int(sys.stdin.read())
         NC = N - NV - NG - NL
-        xpi = self.players.insert()
-        xwi = self.waves.insert()
-        xgi = self.game.insert()
-        xgi.execute(role_id=2,num=NC)
-        xgi.execute(role_id=3,num=NV)
-        xgi.execute(role_id=4,num=NG)
-        xgi.execute(role_id=5,num=NL)
+        self.game.insert().execute(role_id=2,num=NC)
+        self.game.insert().execute(role_id=3,num=NV)
+        self.game.insert().execute(role_id=4,num=NG)
+        self.game.insert().execute(role_id=5,num=NL)
+        for i in range(1,5):
+            self.roles.insert().execute(name=roles[i])
+        self.roles.insert().execute(name='Lupo')
         for i in range(N):
             print "Giocatore %d: " % i
             print "        nome: "
             nome = sys.stdin.read()
             print "    password: "
             pwd = sys.stdin.read()
-            xpi.execute(name=nome, password=pwd, death=0)
-            xwi.execute(player_id=i+1,role_id=1,probability=0.0)
-            xwi.execute(player_id=i+1,role_id=2,probability=float(NC)/N)
-        xwi.execute(player_id=i+1,role_id=3,probability=float(NV)/N)
-        xwi.execute(player_id=i+1,role_id=4,probability=float(NG)/N)
-        xwi.execute(player_id=i+1,role_id=5,probability=float(NL)/N)
+            self.players.insert().execute(name=nome, password=pwd, death=0)
+        self.update_waves()
 
     def __init__(self,url):
         # inizializzo il db
         self.db = create_engine(url)
-        self.db.echo = False
-        metadata = BoundMetaData(db)
-        self.time    = Table('ql_time',    metadata, autoload=True)
-        self.players = Table('ql_players', metadata, autoload=True)
-        self.waves   = Table('ql_waves',   metadata, autoload=True)
-        self.actions = Table('ql_actions', metadata, autoload=True)
-        self.roles   = Table('ql_roles',   metadata, autoload=True)
-        self.game    = Table('ql_game',    metadata, autoload=True)
-        self.logs    = Table('ql_logs',    metadata, autoload=True)
-        
-        # ricostruisco la tabella ql_roles
-        self.roles.delete()
-        xri = self.roles.insert()
-        for i in range(1,5):
-            xri.execute(name=roles[i])
-        xri.execute(name='Lupo')
-        # cancello la tabella time, come indicatore di "server not running"
-        self.time.delete()
+        self.md = MetaData(db)
+        self.time    = Table('ql_time',    self.md, autoload=True)
+        self.players = Table('ql_players', self.md, autoload=True)
+        self.waves   = Table('ql_waves',   self.md, autoload=True)
+        self.actions = Table('ql_actions', self.md, autoload=True)
+        self.roles   = Table('ql_roles',   self.md, autoload=True)
+        self.game    = Table('ql_game',    self.md, autoload=True)
+        self.logs    = Table('ql_logs',    self.md, autoload=True)
 
 # DEBUG
 class LOGS(DataBase):
@@ -318,25 +325,30 @@ class LOGS(DataBase):
 
 
 if __name__ == '__main__':
-    db = DataBase(dburl.giove)
+    db = DataBase(dburl.local_giove)
     if not (len(sys.argv) > 0 and sys.argv[0] == '-c'):
         db.clear()
+    else:
+        db.logs.clear()
     state = db.initial_state()
 
-    for day in range(1,state.N):
+    for x in range(1,state.N):
+        day = x
         if day > 1:
             # giorno!
-            #xti = time.insert(day=day,phase=1)
-            #xti.execute()
-            db.wait(True)
+            db.time.delete().execute()
+            db.time.insert().execute(day=day,phase=1)
+            while not db.turn_done(True):
+                time.sleep(2)
             db.vote(db.get_actions())
             if state.finished():
                 db.end_game()
                 break
         # notte!
-        #xti = time.insert(day=day,phase=2)
-        #xti.execute()
-        db.wait(False)
+        db.time.delete().execute()
+        db.time.insert().execute(day=day,phase=2)
+        while not db.turn_done(False):
+            time.sleep(2)
         a = db.get_actions()
         db.check_seerings(a)
         state.bite(a)
@@ -348,4 +360,3 @@ if __name__ == '__main__':
 # logs.delete(logs.c.player_id==1).execute()
 # logs.update(logs.c.player_id==2).execute(content='Nuovo contenuto')
 # logs.select(logs.c.player_id==2).execute().fetchall()
-
