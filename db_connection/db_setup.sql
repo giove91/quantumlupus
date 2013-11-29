@@ -5,6 +5,8 @@ DROP TABLE IF EXISTS ql_roles;
 DROP TABLE IF EXISTS ql_waves;
 DROP TABLE IF EXISTS ql_actions;
 DROP TABLE IF EXISTS ql_time;
+DROP TABLE IF EXISTS ql_logs;
+DROP TABLE IF EXISTS ql_game;
 
 -- PLAYERS
 
@@ -12,7 +14,7 @@ CREATE TABLE IF NOT EXISTS ql_players (
 	id INT NOT NULL auto_increment,
 	name VARCHAR(256) NOT NULL,
 	password VARCHAR(256) NOT NULL,
-	alive BOOL,
+	death INT,
 	PRIMARY KEY (id) ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -48,3 +50,21 @@ CREATE TABLE IF NOT EXISTS ql_actions (
 CREATE TABLE IF NOT EXISTS ql_time (
 	day INT NOT NULL,
 	phase INT NOT NULL );
+
+
+-- LOGS
+
+CREATE TABLE IF NOT EXISTS ql_logs (
+	id INT NOT NULL auto_increment,
+	player_id INT NOT NULL,
+	day INT NOT NULL,
+	content VARCHAR(256),
+	PRIMARY KEY (id) );
+
+
+-- GAME
+
+CREATE TABLE IF NOT EXISTS ql_game (
+	role_id INT NOT NULL,
+	num INT,
+	PRIMARY KEY (role_id) );

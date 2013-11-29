@@ -234,8 +234,9 @@ class DataBase:
         self.waves   = Table('ql_waves',   metadata, autoload=True)
         self.actions = Table('ql_actions', metadata, autoload=True)
         self.roles   = Table('ql_roles',   metadata, autoload=True)
+        self.game    = Table('ql_game',    metadata, autoload=True)
         self.logs    = Table('ql_logs',    metadata, autoload=True)
-
+        
         # ricostruisco la tabella ql_roles
         self.roles.delete()
         xri = self.roles.insert()
