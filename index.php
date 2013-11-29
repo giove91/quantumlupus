@@ -27,7 +27,8 @@ else {
 	
 	
 	// Caricamento giocatori vivi
-	$query = "SELECT id, name FROM ql_players WHERE (death=0) ORDER BY name";
+	// $query = "SELECT id, name FROM ql_players WHERE (death=0) ORDER BY name";
+	$query = "SELECT id, name FROM ql_players ORDER BY name";
 	$res = query($query);
 	$players = array( array(0,"*Nessuno*") );
 	while ( $row = $res->fetch_assoc() ) {
@@ -135,11 +136,11 @@ else {
 	while ( $row = $res->fetch_assoc() ) {
 		$status = "";
 		if ( $row["death"] == 0 ) $status = "vivo con probabilità ".( (int)(100.0 - 100.0*$row["death_probability"])."%" );
-		else $status = "Morto mediamente il giorno ".sprintf("%.1lf",(double)($row["death"]));
+		else $status = "morto mediamente il giorno ".sprintf("%.1lf",(double)($row["death"])/20.0);
 		$role = "";
 		if ( $row["death"] != 0 ) {
-			if ( (double)($row["wolf_probability"]) > 0.9 ) $role = "Lupo";
-			else $role = "Buono";
+			if ( (double)($row["wolf_probability"]) > 0.9 ) $role = "(lupo)";
+			else $role = "(villico)";
 		}
 		$tabella[] = array( $row["name"], $status, $role );
 	}
@@ -167,7 +168,7 @@ else {
 		$res = query($query);
 		$list = array();
 		while ( $row = $res->fetch_assoc() ) {
-			$list[] = $row["role"]." con probabilità ".$row["probability"];
+			$list[] = $row["role"]." con probabilità ".((int)(100*((double)($row["probability"]))))."%";
 		}
 		make_list($list);
 	}

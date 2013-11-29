@@ -74,7 +74,7 @@ class QuantumState:
     def __repr__(self):
         s = '%d \t(day %d)' % (len(self), day)
         for i in range(self.N):
-            s += '\n%s' % '\t'.join([str((10*self[i][0]/self[i][1])/10.0) if self[i][1] > 0 else '0'] + [str(100*x/len(self))+'%' for x in self[i][1:]])
+            s += '\n%s' % '\t'.join([str((5*self[i][0]/self[i][1])/10.0) if self[i][1] > 0 else '0'] + [str(100*x/len(self))+'%' for x in self[i][1:]])
         return s
     
     def __len__(self):
@@ -106,7 +106,7 @@ class QuantumState:
         for s in self.quantum:
             if s[kill] == result[kill]:
                 ns = list(s)
-                ns[kill] = (ns[kill][0],day)
+                ns[kill] = (ns[kill][0],2*day)
                 nq.add(tuple(ns))
         self.quantum = nq
         self.waves = None
@@ -140,10 +140,10 @@ class QuantumState:
                     bitten = a[2]
                 if a[1] == 4 and s[a[0]] == (4,0) and not done[a[0]]:
                     protected += [a[2]]
-                    done[a[1]] = True
+                    done[a[0]] = True
             ns = list(s)
             if bitten >= 0 and bitten not in protected:
-                ns[bitten] = (ns[bitten][0],day)
+                ns[bitten] = (ns[bitten][0],2*day+1)
             nq.add(tuple(ns))
         self.quantum = nq
         self.waves = None
@@ -229,9 +229,18 @@ class DataBase:
         # logga le informazioni sul fine partita
         result = False
         logtext = ''
+        imax=False
         for i in range(state.N):
-            if state.quantum[0][i][0] > 4 and state.quantum[0][i][1] == 0:
-                result = True
+            if state.quantum[0][i][1] == 0:
+                imax = True
+                if state.quantum[0][i][0] > 4:
+                    result = True
+        if not imax:
+            imax=0
+            for i in range(1,state.N):
+        	    if state.quantum[0][i][1] > state.quantum[0][imax][1]:
+        	        imax=i
+            result = (state.quantum[0][imax][0] > 4)
         self.logs.insert().execute(player_id=0,day=day,content='La partita e\' finita e hanno vinto i %s!!  Hanno giocato:' % ('lupi' if result else 'villici'))
         for i in range(state.N):
             self.logs.insert().execute(player_id=0,day=day,content='%s (%s)' % (self.get_player_name(i),roles[state.quantum[0][i][0]]))
@@ -241,8 +250,9 @@ class DataBase:
         done = [False for i in range(state.N)]
         nvot = [[] for i in range(state.N)]
         for v in votes:
-            if v[1] == 1 and not done[v[0]] and state[v[2]][1] < len(state):
+            if v[1] == 1 and not done[v[0]] and state[v[0]][1] < len(state) and state[v[2]][1] < len(state):
                 nvot[v[2]].append(v[0])
+                done[v[0]] = True
         winners = []
         maxv = max([len(i) for i in nvot])
         for i in range(state.N):
@@ -263,7 +273,7 @@ class DataBase:
         done = [False for i in range(state.N)]
         for a in actions:
             if a[1] == 3 and not done[a[0]]:
-                self.logs.insert().execute(player_id=a[0],day=day,content='Hai scrutato %s ed e\' risultato un %s.' % (self.get_player_name(a[2]), ('lupo' if state.seer(a[0],a[2]) else 'villico')) )
+                self.logs.insert().execute(player_id=a[0]+1,day=day,content='Hai scrutato %s ed e\' risultato un %s.' % (self.get_player_name(a[2]), ('lupo' if state.seer(a[0],a[2]) else 'villico')) )
 
     def clear(self):
         # pulisco il database e chiedo come ricostruirlo
@@ -336,10 +346,11 @@ class LOGS(DataBase):
 
 if __name__ == '__main__':
     db = DataBase(dburl.local_giove)
-    if not (len(sys.argv) > 0 and sys.argv[0] == '-c'):
+    if not (len(sys.argv) > 1 and sys.argv[1] == '-c'):
         db.clear()
     else:
-        db.logs.clear()
+        db.logs.delete().execute()
+        state = db.initial_state()
 
     for x in range(1,state.N):
         day = x
@@ -350,9 +361,13 @@ if __name__ == '__main__':
             while not db.turn_done(True):
                 time.sleep(2)
             db.vote(db.get_actions())
+            db.update_waves()
             if state.finished():
                 db.end_game()
+                db.update_waves()
                 break
+        print state
+        print state.quantum
         # notte!
         db.time.delete().execute()
         db.time.insert().execute(day=day,phase=2)
@@ -361,9 +376,15 @@ if __name__ == '__main__':
         a = db.get_actions()
         db.check_seerings(a)
         state.bite(a)
+        db.update_waves()
         if state.finished():
             db.end_game()
+            db.update_waves()
             break
+        print state
+        print state.quantum
+    print state
+    print state.quantum
 
 # logs.insert().execute(content='nuovo contenuto')
 # logs.delete(logs.c.player_id==1).execute()
