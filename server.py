@@ -345,7 +345,7 @@ class LOGS(DataBase):
 
 
 if __name__ == '__main__':
-    db = DataBase(dburl.local_giove)
+    db = DataBase(dburl.giove)
     if not (len(sys.argv) > 1 and sys.argv[1] == '-c'):
         db.clear()
     else:
