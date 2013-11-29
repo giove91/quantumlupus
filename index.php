@@ -26,6 +26,15 @@ else {
 	else $phase_text = "Notte";
 	
 	
+	// Caricamento giocatori vivi
+	$query = "SELECT id, name FROM ql_players WHERE (death=0) ORDER BY name";
+	$res = query($query);
+	$players = array( array(0,"*Nessuno*") );
+	while ( $row = $res->fetch_assoc() ) {
+		$players[ $row["id"] ] = array( $row["id"], $row["name"] );
+	}
+	
+	
 	// Controllo del login
 	$logged = FALSE;
 	$user = "";
@@ -50,8 +59,38 @@ else {
 	}
 	if ( $logged ) paragraph("Sei stato riconosciuto come un giocatore valido, ".bold($user)." (id=".$player_id.").");
 	
+	$actions = array( 1 => "Vota", 2 => "Sbrana", 3 => "Scruta", 4 => "Proteggi" );
+	
+	// Processo le azioni
 	if ( $logged ) {
-		// TODO: Processare le azioni
+		$types = array();
+		
+		if ( $phase == 1 ) {
+			// Giorno
+			$types = array(1);
+		}
+		else {
+			// Notte
+			$types = array(2,3,4);
+		}
+		
+		foreach ( $types as $type ) {
+			if ( isset($_POST["a".$type]) ) {
+				$target = $_POST["a".$type];
+				if ( is_numeric($target) ) {
+					$target = (int)$target;
+					if ( $target != 0 ) {
+						if ( $target != 0 && array_key_exists($target,$players) && ($target != $player_id) ) {
+							$query = "INSERT INTO ql_actions VALUES (0,".$player_id.", ".$type.", ".$target.", ".$day.")";
+							//var_dump($query);
+							$res = query($query);
+							paragraph(bold("Notifica: ")."Memorizzata l'azione di tipo '".$actions[$type]."' su ".$players[$target][1]);
+						}
+						else paragraph(bold("Errore: ")."l'azione di tipo '".$actions[$type]."' su ".$players[$target][1]." non è stata ritenuta valida");
+					}
+				}
+			}
+		}
 	}
 
 	// Descrizione del tempo di gioco
@@ -61,13 +100,7 @@ else {
 	start_form("index.php","POST");
 	paragraph(bold("Autenticazione: ")."Username ".text_input("user",10,$user)." Password ".password_input("password",10,$password));
 	
-	// Caricamento giocatori vivi
-	$query = "SELECT id, name FROM ql_players WHERE (death=0) ORDER BY name";
-	$res = query($query);
-	$players = array( array(0,"*Nessuno*") );
-	while ( $row = $res->fetch_assoc() ) {
-		$players[] = array( $row["id"], $row["name"] );
-	}
+	
 	
 	// Azioni
 	make_title("Azioni",2);
@@ -75,13 +108,13 @@ else {
 	$list = array();
 	if ( $phase == 	1 ) {
 		// Giorno
-		$list[] = "Votazione per la condanna a morte: ".select("1",$players);
+		$list[] = "Votazione per la condanna a morte: ".select("a1",$players);
 	}
 	else {
 		// Notte
-		$list[] = "Sbrana: ".select("2",$players);
-		$list[] = "Scruta: ".select("3",$players);
-		$list[] = "Proteggi: ".select("4",$players);
+		$list[] = "Sbrana: ".select("a2",$players);
+		$list[] = "Scruta: ".select("a3",$players);
+		$list[] = "Proteggi: ".select("a4",$players);
 	}
 	make_list($list);
 	
@@ -89,24 +122,41 @@ else {
 	
 	end_form();
 	
-	// Informazioni note a tutti
+	// Status del villaggio
 	make_title("Status del villaggio",2);
 	
-	// TODO: cambiare la query in modo che ogni giocatore compaia solo una volta
-	$query = "SELECT p.id AS id, p.name AS name, p.death AS death, r.name AS role
-		FROM ql_players AS p LEFT JOIN ql_waves AS w ON (p.id=w.player_id) LEFT JOIN ql_roles AS r ON (w.role_id=r.id)
-		WHERE (ISNULL(w.probability) OR (w.probability > 0.9)) AND (ISNULL(r.id) OR (r.id!=1)) ORDER BY name";
+	// TODO: verificare che ogni giocatore compaia esattamente una volta
+	$query = "SELECT p.id AS id, p.name AS name, p.death AS death, w.probability AS death_probability, w2.probability AS wolf_probability
+		FROM ql_players AS p INNER JOIN ql_waves AS w ON (p.id=w.player_id)
+		INNER JOIN ql_waves AS w2 ON (p.id=w2.player_id)
+		WHERE (w.role_id=1) AND (w2.role_id=5) ORDER BY name";
 	$res = query($query);
 	$tabella = array();
 	while ( $row = $res->fetch_assoc() ) {
 		$status = "";
-		if ( $row["death"] == 0 ) $status = "Vivo";
+		if ( $row["death"] == 0 ) $status = "Vivo con probabilità ".( (int)(100.0 - 100.0*$row["death_probability"]) );
 		else $status = "Morto mediamente il giorno ".$row["death"];
 		$role = "";
-		if ( $row["death"] != 0 ) $role = $row["role"];
+		if ( $row["death"] != 0 ) {
+			if ( (double)($row["wolf_probability"]) > 0.9 ) $role = "Lupo";
+			else $role = "Buono";
+		}
 		$tabella[] = array( $row["name"], $status, $role );
 	}
 	paragraph(return_table($tabella));
+	
+	
+	// Log del villaggio
+	make_title("Log del villaggio",2);
+	
+	$query = "SELECT * FROM ql_logs WHERE player_id=0 ORDER BY day DESC, id DESC";
+	$res = query($query);
+	$list = array();
+	while ( $row = $res->fetch_assoc() ) {
+		$list[] = "[Giorno ".$row["day"]."] ".$row["content"];
+	}
+	make_list($list);
+	
 	
 	// Status personale
 	if ( $logged ) {
