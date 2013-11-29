@@ -343,3 +343,9 @@ if __name__ == '__main__':
         if state.finished():
             db.end_game()
             break
+
+# logs.insert().execute(content='nuovo contenuto')
+# logs.delete(logs.c.player_id==1).execute()
+# logs.update(logs.c.player_id==2).execute(content='Nuovo contenuto')
+# logs.select(logs.c.player_id==2).execute().fetchall()
+
