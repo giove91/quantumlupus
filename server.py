@@ -151,7 +151,7 @@ class QuantumState:
                     protected += [a[2]]
                     done[a[0]] = True
             ns = list(s)
-            if bitten >= 0 and bitten not in protected:
+            if bitten >= 0 and bitten not in protected and ns[bitten][1] == 0:
                 ns[bitten] = (ns[bitten][0],2*day+1)
             nq.add(tuple(ns))
         self.quantum = nq
