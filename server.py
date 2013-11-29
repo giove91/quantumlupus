@@ -7,7 +7,7 @@ import dburl, sys, random, time
 # giorno e stato sono variabili globali
 day = 0
 state = None
-roles = [None,'Morto','Contadino','Veggente','Guardia','Lupo alfa','Lupo beta','Lupo gamma','Lupo delta','Lupo epsilon']
+roles = [None,'Morto','Contadino','Veggente','Guardia','Lupo alfa','Lupo beta','Lupo gamma','Lupo delta','Lupo epsilon', 'Lupo zeta', 'Lupo eta', 'Lupo theta']
 
 
 # funzione che produce una sequenza casuale
@@ -300,6 +300,7 @@ class DataBase:
         for a in actions:
             if a[1] == 3 and not done[a[0]]:
                 self.logs.insert().execute(player_id=a[0]+1,day=day,content='Hai scrutato %s ed e\' risultato un %s.' % (self.get_player_name(a[2]), ('lupo' if state.seer(a[0],a[2]) else 'villico')) )
+                done[a[0]] = True
 
     def clear(self):
         # pulisco il database e chiedo come ricostruirlo
@@ -381,8 +382,10 @@ if __name__ == '__main__':
             # giorno!
             db.time.delete().execute()
             db.time.insert().execute(day=day,phase=1)
-            while not db.turn_done(True):
+            counter = 0
+            while not db.turn_done(True) and counter < 150:
                 time.sleep(2)
+                counter += 1
             db.vote(db.get_actions())
             db.update_waves()
             if state.finished():
@@ -394,8 +397,10 @@ if __name__ == '__main__':
         # notte!
         db.time.delete().execute()
         db.time.insert().execute(day=day,phase=2)
-        while not db.turn_done(False):
+        counter = 0
+        while not db.turn_done(False) and counter < 60:
             time.sleep(2)
+            counter += 1
         a = db.get_actions()
         db.check_seerings(a)
         state.bite(a)
