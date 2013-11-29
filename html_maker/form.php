@@ -12,8 +12,8 @@ function text_input($nome, $size = 30, $value = "", $params = "") {
 	return '<input name="'.$nome.'" type="text" size="'.$size.'" value="'.$value.'" '.$params.' />';
 }
 
-function password_input($nome, $size = 30) {
-	return '<input name="'.$nome.'" type="password" size="'.$size.'" value="" />';
+function password_input($nome, $size = 30, $value = "") {
+	return '<input name="'.$nome.'" type="password" size="'.$size.'" value="'.$value.'" />';
 }
 
 function submit_input($value) {
