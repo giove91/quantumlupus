@@ -16,6 +16,64 @@ $res = query($query);
 if ( !($row = $res->fetch_assoc()) ) {
 	// Partita non ancora settata
 	paragraph("La partita non è stata ancora creata.");
+	
+	// Processo la registrazione
+	$registered = FALSE;
+	$user = "";
+	$password = "";
+	if ( isset($_POST["r_user"]) && isset($_POST["r_password"]) ) {
+		$user = $GLOBALS["connection"]->real_escape_string($_POST["r_user"]);
+		$password = $GLOBALS["connection"]->real_escape_string($_POST["r_password"]);
+		if ( ( strlen($user) > 0 ) && ( strlen($password) > 0 ) && ( strlen($user) < 32 ) && ( strlen($password) < 256 ) ) {
+			$query = "SELECT id FROM ql_players WHERE name='".$user."'";
+			$res = query($query);
+			if ( $res->fetch_assoc() ) {
+				// Errore
+				paragraph("Errore nella registrazione: nome già in uso.");
+			}
+			else {
+				// Username disponibile
+				// Scelta dell'id
+				$query = "SELECT max(id) AS max FROM ql_players";
+				$res = query($query);
+				$row = $res->fetch_assoc();
+				$max = $row["max"];
+				if ( is_null($max) ) {
+					$max = 0;
+				}
+				else $max = (int)$max;
+				$id = $max+1;
+				
+				// Inserimento nel DB
+				$query = "INSERT INTO ql_players VALUES (".$id.",'".$user."','".$password."',0)";
+				$res = query($query);
+				
+				// Verifica
+				$query = "SELECT id FROM ql_players WHERE (id=".$id.") AND (name='".$user."') AND (password='".$password."')";
+				$res = query($query);
+				if ( $row = $res->fetch_assoc() ) {
+					$registered = TRUE;
+					paragraph("Registrazione effettuata con successo (nome: ".$user."). Attendi l'inizio della partita.");
+				}
+				else {
+					// Errore
+					paragraph("Errore nella registrazione: qualcuno ti ha scippato l'id, riprova.");
+				}
+			}
+		}
+		else {
+			// Errore
+			paragraph("Errore nella registrazione: nome o password non sono della lunghezza appropriata.");
+		}	
+	}
+	
+	
+	// Registrazione
+	start_form("index.php","POST");
+	paragraph(bold("Registrazione: ")."Username ".text_input("r_user",10,$user)." Password ".password_input("r_password",10,$password));
+	paragraph(submit_input("Invia"));
+	end_form();
+	
 }
 else {
 	
