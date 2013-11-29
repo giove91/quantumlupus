@@ -250,6 +250,7 @@ class DataBase:
         self.players.delete()
         self.waves.delete()
         self.actions.delete()
+        self.game.delete()
         self.logs.delete()
         print "Numero di giocatori: "
         N = int(sys.stdin.read())
@@ -262,6 +263,11 @@ class DataBase:
         NC = N - NV - NG - NL
         xpi = self.players.insert()
         xwi = self.waves.insert()
+        xgi = self.game.insert()
+        xgi.execute(role_id=2,num=NC)
+        xgi.execute(role_id=3,num=NV)
+        xgi.execute(role_id=4,num=NG)
+        xgi.execute(role_id=5,num=NL)
         for i in range(N):
             print "Giocatore %d: " % i
             print "        nome: "
