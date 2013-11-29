@@ -68,7 +68,27 @@ class DEBUG():
         DataBase.vote(LOGS(),a)
         print state
 
-    def __call__(self):
+    def start(self):
+        global state
+        global day
+        global db
+        db = DataBase(dburl.giove)
+        state = db.initial_state()
+        day = 1
+
+    def __call__(self,a = True):
+        if a:
+            global state
+            global day
+            a = db.get_actions()
+            db.check_seerings(a)
+            state.bite(a)
+            db.update_waves()
+            day += 1
+            a = db.get_actions()
+            db.vote(a)
+            db.update_waves()
+            return
         self.setup()
         while not state.finished():
             self.doday()
