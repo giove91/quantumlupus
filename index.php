@@ -165,17 +165,18 @@ else {
 	make_title("Azioni",2);
 	
 	$list = array();
+	$tabella = array();
 	if ( $phase == 	1 ) {
 		// Giorno
-		$list[] = "Votazione per la condanna a morte: ".select("a1",$players);
+		$tabella[] = array( "Votazione per la condanna a morte: ", select("a1",$players) );
 	}
 	else {
 		// Notte
-		$list[] = "Sbrana: ".select("a2",$players);
-		$list[] = "Scruta: ".select("a3",$players);
-		$list[] = "Proteggi: ".select("a4",$players);
+		$tabella[] = array( "Sbrana: ", select("a2",$players) );
+		$tabella[] = array( "Scruta: ", select("a3",$players) );
+		$tabella[] = array( "Proteggi: ", select("a4",$players) );
 	}
-	make_list($list);
+	make_table($tabella);
 	
 	paragraph(submit_input("Invia"));
 	
