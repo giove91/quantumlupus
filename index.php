@@ -21,7 +21,7 @@ else {
 	
 	$phase = $row["phase"];
 	$phase_text = "";
-	$day = $row["day"];
+	$day = (int)($row["day"]);
 	if ( $phase == 1 ) $phase_text = "Giorno";
 	else $phase_text = "Notte";
 	
@@ -135,7 +135,7 @@ else {
 	while ( $row = $res->fetch_assoc() ) {
 		$status = "";
 		if ( $row["death"] == 0 ) $status = "Vivo con probabilità ".( (int)(100.0 - 100.0*$row["death_probability"]) );
-		else $status = "Morto mediamente il giorno ".$row["death"];
+		else $status = "Morto mediamente il giorno ".sprintf("%.1lf",(double)($row["death"]));
 		$role = "";
 		if ( $row["death"] != 0 ) {
 			if ( (double)($row["wolf_probability"]) > 0.9 ) $role = "Lupo";
@@ -149,7 +149,7 @@ else {
 	// Log del villaggio
 	make_title("Log del villaggio",2);
 	
-	$query = "SELECT * FROM ql_logs WHERE player_id=0 ORDER BY day DESC, id DESC";
+	$query = "SELECT * FROM ql_logs WHERE player_id=0 AND (day>=".($day-1).") ORDER BY day, id";
 	$res = query($query);
 	$list = array();
 	while ( $row = $res->fetch_assoc() ) {
