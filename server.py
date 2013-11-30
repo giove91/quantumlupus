@@ -83,11 +83,11 @@ class DEBUG():
             a = db.get_actions()
             db.check_seerings(a)
             state.bite(a)
-            db.update_waves()
+            state
             day += 1
             a = db.get_actions()
             db.vote(a)
-            db.update_waves()
+            state
             return
         self.setup()
         while not state.finished():
