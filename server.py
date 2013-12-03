@@ -52,7 +52,7 @@ class DEBUG():
         global state
         global day
         day = 1
-        state = QuantumState(10,1,1,2)
+        state = QuantumState(10,2,1,2)
         print state
 
     def doday(self):
@@ -331,7 +331,7 @@ class DataBase:
     def clear(self):
         # pulisco il database e chiedo come ricostruirlo
         self.time.delete().execute()
-        self.players.delete().execute()
+        #self.players.delete().execute()
         self.waves.delete().execute()
         self.actions.delete().execute()
         self.roles.delete().execute()

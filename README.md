@@ -1,4 +1,0 @@
-quantumlupus
-============
-
-Quantumlupus server

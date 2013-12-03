@@ -1,0 +1,38 @@
+DESCRIZIONE DATABASE
+
+-	nella tabella status vengono inseriti i dati NON divisi per il numero di stati
+	attuali il quale si trova in games>max_states
+-	in fase di creazione di partita, invece, games>max_states indica con quanti
+	stati al massimo va creata la partita
+-	il server fa partire la partita quando sono stati assegnati ruoli a tutti i
+	giocatori (contadini compresi). Ruoli in eccesso vengono scartati, e giocatori
+	oltre games>max_players vengono altrettanto scartati e rimossi dalla partita
+-	il server memorizza il momento in cui terminerà la prossima fase in
+	games>countdown, come secondi dalla epoch
+-	il campo games>password, se non NULL, implica che chi vuole iscriversi alla
+	partita deve inserire quella password
+-	il giocatore segnato come games>admin_id può aggiungere ruoli in villages
+	e quindi far sì che la partita possa cominciare
+-	il campo villages>is_quantum, se false indica un ruolo che non viene attribuito
+	in modo quantistico ma invece fissato all'inizio (se ne occupa il server comunque)
+
+
+
+OLD TODOLIST
+
+SERVER
+*  supporto player_id non in ordine
+*  corrispondenza ruolo_id e type
+*  aggiungere ruoli "amante, investigatore, stalker, medico, messia, cacciatore"
+*  aggiungere ruoli certi (ruoli assegnati con probabilità 1 a inizio partita)
+*  tradurre classe QuantumState in C++
+*  aggiungere supporto partite multiple
+
+CLIENT
+*  visualizzare ruoli presenti
+*  aggiungere a status personale "compagni lupi" con probabilità condizionate
+*  aggiungere a status personale "probabilità di essere lupo dominante"
+*  autorefresh
+*  status personale nascondibile
+*  avvio partita via web
+*  chat
