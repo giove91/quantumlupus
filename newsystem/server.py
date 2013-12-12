@@ -5,9 +5,9 @@ import sys, random, time
 import db_url, localization as qwl, ruleset as qwr
 
 
-###############################
-#			utils			#
-###############################
+#################################
+#	utils						#
+#################################
 
 def randiff(N,v):
 	if len(v) >= N or len(v) == 0:
@@ -17,9 +17,9 @@ def randiff(N,v):
 		r = random.randint(0,N-1)
 	return r
 
-###############################
-#		permutations		 #
-###############################
+#################################
+#	permutations				#
+#################################
 
 def num_permutation(s, start):
 	n   = len(s) - start
@@ -55,16 +55,18 @@ def next_permutation(s, start):
 	return True
 
 
-###############################
-#		QuantumState		 #
-###############################
+#################################
+#	QuantumState				#
+#################################
 
 class QuantumState:
-	def __init__(self,roles, max_states):
+	# inizializza uno stato quantistico con certi ruoli e un massss
+	def __init__(self,roles, max_states = 1000000):
 		self.N = len(roles)
+		self.day = 1
 		self.quantum = []
 		self.status = None
-		self.end = False
+		self.end = None
 		roles.sort()
 		wolf = 0
 		for i in roles:
@@ -96,11 +98,18 @@ class QuantumState:
 				self.quantum.append([[s[p[j]],0] for j in xrange(self.N)])
 			if max_states < len(self.quantum):
 				self.quantum = random.sample(self.quantum, max_states)
+
 	def __len__(self):
 		return len(self.quantum)
+
+	def __iadd__(self,n):
+		self.day += n
+		return self
+	
 	def __getitem__(self,id):
 		if self.status is not None:
 			return self.status[id]
+		self.clean()
 		self.status = [[0, [0 for r in xrange(qwr.ROLE_WEREWOLF+2)], [0 for j in xrange(self.N)], 0] for id in xrange(self.N)]
 		wolf = False
 		good = False
@@ -116,28 +125,64 @@ class QuantumState:
 						good = True
 				if s[id][0] >= qwr.ROLE_WEREWOLF:
 					self.status[id][qwr.STATUS_ROLE][qwr.ROLE_WEREWOLF] += 1
-					if not [0 for i in s if i[0]>=qwr.ROLE_WEREWOLF and i[0]<s[id][0] and i[1] & ~qwr.DEATH_NULL == 0]:
+					if  s[id][1] & ~qwr.DEATH_NULL == 0 and not [0 for i in s if i[0]>=qwr.ROLE_WEREWOLF and i[0]<s[id][0] and i[1] & ~qwr.DEATH_NULL == 0]:
 						self.status[id][qwr.STATUS_ROLE][qwr.ROLE_WEREWOLF+1] += 1
 					for j in xrange(self.N):
 						if s[j][0] >= qwr.ROLE_WEREWOLF:
 							self.status[id][qwr.STATUS_WOLFRIEND][j] += 1
-				else:
+				elif abs(s[id][0]) != qwr.ROLE_DEAD:
 					self.status[id][qwr.STATUS_ROLE][abs(s[id][0])] += 1
-		if wolf == False or good == False:
+		if wolf == False:
 			self.end = True
+		if good == False:
+			self.end = False
 		return self.status[id]
+
 	def __repr__(self):
-		s = '%d states' % len(self)
+		d = qwl.Dictionary()
+		r = [False for i in xrange(qwr.ROLE_WEREWOLF+1)]
+		s = '%d states\n\nG Morte\tMorto\t' % len(self)
+		for i in xrange(1,qwr.ROLE_WEREWOLF):
+			for j in xrange(self.N):
+				if self[j][qwr.STATUS_ROLE][i] > 0:
+					r[i] = True
+					s += '%s\t' % (d.roles[i] if len(d.roles[i]) < 8 else d.roles[i][:7])
+					break
+		s += 'Lupo'
+		r[qwr.ROLE_DEAD] = True
+		r[qwr.ROLE_WEREWOLF] = True
 		for i in range(self.N):
-			t = [str((10*self[i][qwr.STATUS_DEATHDAY]/self[i][qwr.STATUS_ROLE][qwr.ROLE_DEAD])/10.0) if self[i][qwr.STATUS_ROLE][qwr.ROLE_DEAD] > 0 else '0'] + [str(100*x/len(self))+'%' for x in self[i][qwr.STATUS_ROLE][:-1]]
+			if self[i][qwr.STATUS_ROLE][qwr.ROLE_DEAD] > 0:
+				t = [str((10*self[i][qwr.STATUS_DEATHDAY]/self[i][qwr.STATUS_ROLE][qwr.ROLE_DEAD])/10.0)]
+			else:
+				t = ['0']
+			for j in xrange(qwr.ROLE_WEREWOLF+1):
+				if r[j]:
+					t += [str(100*self[i][qwr.STATUS_ROLE][j]/len(self))+'%']
 			if self[i][qwr.STATUS_ROLE][-2] > 0:
 				t += ['D:'+str(100*self[i][qwr.STATUS_ROLE][-1]/self[i][qwr.STATUS_ROLE][-2])+'%'] + [str(100*x/self[i][qwr.STATUS_ROLE][-2])+'%' for x in self[i][qwr.STATUS_WOLFRIEND]]
 			s += '\n%s' % '\t'.join(t)
 		return s
+
+	def winner(self):
+		l = self[0]
+		return self.end
+
+	def clean(self):
+		for r in xrange(qwr.ROLE_WEREWOLF):
+			if qwr.ROLE_DESC[r][1] == qwr.ROLE_PASSIVE and r in [x[0] for x in self.quantum[0]]:
+				for i in xrange(self.N):
+					self.act(None,i,r,None)
+		for s in self.quantum:
+			for i in xrange(len(s)):
+				if s[i][1] == qwr.DEATH_NULL:
+					s[i][1] = 0
+		self.status = None
+
 	def filter(self, check):
 		j = 0
 		for i in xrange(len(self)):
-			if check(self.quantum(i)):
+			if check(self.quantum[i]):
 				self.quantum[j] = self.quantum[i]
 				self.quantum[j]
 				j += 1
@@ -145,52 +190,43 @@ class QuantumState:
 			return False
 		self.quantum = self.quantum[:j]
 		return True
-	def lynch(self, n, day):
+
+	def lynch(self, n):
 		if not self.filter(lambda s: s[n][1] == 0):
 			return False
 		role = random.choice(self.quantum)[n][0]
 		self.filter(lambda s: s[n][0] == role)
 		for s in self.quantum:
-			s[n][1] = -day
+			s[n][1] = -self.day
 		self.status = None
 		return True
-	def measure(self, a, c, r, t, d):
+
+	def act(self, a, c, r, t):
 		if qwr.ROLE_DESC[r][1] == qwr.ROLE_MEASURE:
-			sample = random.choice(self.quantum)
-			if sample[c][0] == r and sample[c][1] & ~qwr.DEATH_NULL == 0:
-				res = qwr.ROLE_DESC[r][2](s,a,t,False)
+			s = random.choice(self.quantum)
+			if qwr.ROLE_DESC[r][3] == qwr.ERROR_NEVER or (s[c][0] == r and s[c][1] & ~qwr.DEATH_NULL == 0):
+				res = qwr.ROLE_DESC[r][2](s,a,c,t,None)
 			else:
-				if len(qwr.ROLE_DESC[r] == 3):
-					res = qwr.ROLE_DESC[r][2](s,a,randiff(self.N,c),False)
-				else:
-					res = randiff(self.N,qwr.ROLE_DESC[r][3])
-			self.filter(lambda s: s[c][0] != r or s[c][1] & ~qwr.DEATH_NULL != 0 or (qwr.ROLE_DESC[r][2](s,a,t,True) == res))
+				res = qwr.ROLE_DESC[r][2](s,a,c,randiff(self.N,[c]),None)
+			if not self.filter(lambda s: s[c][0] != r or s[c][1] & ~qwr.DEATH_NULL != 0 or (qwr.ROLE_DESC[r][2](s,a,c,t,res)) == res):
+				for s in self.quantum:
+					s[c][1] = self.day
+				return False
 			return res
-		if qwr.ROLE_DESC[r][1] in (qwr.ROLE_TRANSFORM, qwr.ROLE_PASSIVE):
+		if qwr.ROLE_DESC[r][1] == qwr.ROLE_TRANSFORM:
 			for s in self.quantum:
-				if s[c][0] == r and s[c][1] & ~qwr.DEATH_NULL == 0:
-					qwr.ROLE_DESC[r][2](s,c,t,d)
+				if min(s[c][0],qwr.ROLE_WEREWOLF) == r and s[c][1] & ~qwr.DEATH_NULL == 0:
+					qwr.ROLE_DESC[r][2](s,c,t,self.day)
+		if qwr.ROLE_DESC[r][1] == qwr.ROLE_PASSIVE:
+			for s in self.quantum:
+				if s[c][0] == r:
+					qwr.ROLE_DESC[r][2](s,c,t,self.day)
 		self.status = None
-	def end_night(self):
-		for s in self.quantum:
-			for i in xrange(len(s)):
-				if s[i][1] == qwr.DEATH_NULL:
-					s[i][1] = 0
-		self.status = None
-	def winner(self):
-		self.quantum = [random.choice(self.quantum)]
-		imax = 0
-		for id in xrange(1,self.N):
-			if self.quantum[0][id][1] == 0:
-				return self.quantum[0][id][0] < qwr.ROLE_WEREWOLF
-			if self.quantum[0][id][1] < self.quantum[0][imax][1]:
-				imax = id
-		return (self.quantum[0][imax][0] < qwr.ROLE_WEREWOLF)
 
 
-###############################
-#		  DataBase		   #
-###############################
+#################################
+#	DataBase					#
+#################################
 
 class DataBase:
 	# init the database taken from a certain url
@@ -228,9 +264,9 @@ class DataBase:
 		self.players.update(self.players.c.game_id==id).execute(game_id=None)
 
 
-###############################
-#		   Village		   #
-###############################
+#################################
+#	Village						#
+#################################
 
 class Village:
 	# init the village with a certain id and database
@@ -327,9 +363,9 @@ class Village:
 		return True
 
 
-###############################
-#			Debug			#
-###############################
+#################################
+#	Debug						#
+#################################
 
 
 # classe che si interfaccia con il database
@@ -510,51 +546,79 @@ if __name__ == '__main__' and False:
 		# print state.quantum
 	print state
 	# print state.quantum
-	names = ['Ammalia','Brumo','Carna','Darlo','Elica','Fascio','Gorgo','Hanno','Iene','Lucca','Marcio','Nicolla']
 
 # logs.insert().execute(content='nuovo contenuto')
 # logs.delete(logs.c.player_id==1).execute()
 # logs.update(logs.c.player_id==2).execute(content='Nuovo contenuto')
 # logs.select(logs.c.player_id==2).execute().fetchall()
 
-class DEBUG():
-	def randiff(self,N,i):
-		r = i
-		while r == i:
-			r = random.randint(0,N-1)
-		return r
-	
-	def randact(self,N):
-		a = []
-		for k in range(1,5):
-			a += [[i,k,self.randiff(N,i)] for i in range(N)]
-		return a
-	
-	def setup(self):
-		global state
-		global day
-		day = 1
-		state = QuantumState(10,1,1,2)
-		print state
-	
-	def doday(self):
-		global day
-		assert(day>0)
-		a = self.randact(state.N)
-		DataBase.check_seerings(LOGS(),a)
-		state.bite(a)
-		print state
-		if state.finished():
-			return
-		day = day+1
-		DataBase.vote(LOGS(),a)
-		print state
-	
-	def __call__(self):
-		self.setup()
-		while not state.finished():
-			self.doday()
-		DataBase.end_game(LOGS())
+class dQS():
+	def display(self,state):
+		i = -3
+		for l in repr(state).split('\n'):
+			f = l
+			if i == -1:
+				f = '\t' + f + '\t\t' + '\t'.join([self.names[j] for j in range(state.N)])
+			if i >= 0:
+				f = self.names[i] + '\t' + f
+			if len(f.split('\t')) > 22:
+				print '\t'.join(f.split('\t')[:22])
+			else:
+				print f
+			i += 1
+
+	def __call__(self,N):
+		d = qwl.Dictionary()
+		if isinstance(N,int):
+			roles = [random.randint(-qwr.ROLE_WEREWOLF+1,qwr.ROLE_WEREWOLF-1) for i in range(N-N/3)] + [qwr.ROLE_WEREWOLF * (2*random.randint(0,1)-1) for i in range(N/3)]
+		else:
+			roles = N
+			N = len(roles)
+		print "Ruoli presenti:", roles
+		state = QuantumState(roles,2000000)
+		while True:
+			print "\n--- notte %d ---" % state.day
+			self.display(state)
+			if state.winner() is not None:
+				break
+			a = [[None for j in range(qwr.ROLE_WEREWOLF+1)] for i in xrange(N)]
+			l = []
+			for p in xrange(qwr.PRIORITY_MAX):
+				prol = [i for i in xrange(qwr.ROLE_WEREWOLF+1) if qwr.ROLE_DESC[i][0] == p]
+				ll = sum([[[i,r] for i in xrange(N) if state[i][qwr.STATUS_ROLE][qwr.ROLE_DEAD] < len(state) and state[i][qwr.STATUS_ROLE][r] > 0] for r in prol],[])
+				random.shuffle(ll)
+				l += ll
+			for x in l:
+				a[x[0]][x[1]] = randiff(N,[x[0]])
+			for x in l:
+				print "%s ha %s %s" % (self.names[x[0]],d.actions[x[1]],self.names[a[x[0]][x[1]]]),
+				res = state.act(a, x[0], x[1], a[x[0]][x[1]])
+				if isinstance(res,bool):
+					print "con esito", ('positivo' if res else 'negativo')
+				elif isinstance(res,int):
+					print "scoprendo", self.names[res]
+				else:
+					print
+			state[0]
+			state += 1
+			print "\n--- giorno %d ---" % state.day
+			self.display(state)
+			if state.winner() is not None:
+				break
+			while True:
+				r = random.randint(0,N-1)
+				if state.lynch(r):
+					print "\nLinciamo %s!!! Ammorteee" % self.names[r]
+					break
+		res = len(state)
+		print
+		print "Hanno vinto i %s!" % ('villici' if state.winner() else 'lupi')
+		print "--- final day: extracted from %d states ---" % res
+		self.display(state)
+
+	def __init__(self):
+		self.active  = [i for i in xrange(qwr.ROLE_WEREWOLF+1) if qwr.ROLE_DESC[i][1] in [qwr.ROLE_MEASURE,qwr.ROLE_TRANSFORM]]
+		self.names = ['Ammalia','Brumo','Carna','Darlo','Elica','Fascio','Gorgo','Hanno','Iene','Lucca','Marcio','Nicolla','Orario','Pallo','Quisto','Rodeo','Sana','Tiziamo','Uggio','Vanesio','Zorro']
 
 if __name__ != '__main__':
-	d = DEBUG()
+	d = dQS()

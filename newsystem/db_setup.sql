@@ -19,8 +19,9 @@
 -- ROLE_SHAMAN		8
 -- ROLE_HUNTER		9
 -- ROLE_GUARD		10
--- ROLE_LOVER		11
--- ROLE_WEREWOLF	12
+-- ROLE_MAYOR		11
+-- ROLE_LOVER		12
+-- ROLE_WEREWOLF	13
 -- -------------------
 
 
