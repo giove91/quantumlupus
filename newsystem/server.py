@@ -103,6 +103,7 @@ class QuantumState:
 		return len(self.quantum)
 
 	def __iadd__(self,n):
+		self.clean()
 		self.day += n
 		return self
 	
@@ -166,6 +167,10 @@ class QuantumState:
 
 	def winner(self):
 		l = self[0]
+		if self.end is None:
+			return self.end
+		self.quantum = [random.choice(self.quantum)]
+		self.status = None
 		return self.end
 
 	def clean(self):
@@ -599,7 +604,6 @@ class dQS():
 					print "scoprendo", self.names[res]
 				else:
 					print
-			state[0]
 			state += 1
 			print "\n--- giorno %d ---" % state.day
 			self.display(state)
@@ -610,10 +614,9 @@ class dQS():
 				if state.lynch(r):
 					print "\nLinciamo %s!!! Ammorteee" % self.names[r]
 					break
-		res = len(state)
 		print
 		print "Hanno vinto i %s!" % ('villici' if state.winner() else 'lupi')
-		print "--- final day: extracted from %d states ---" % res
+		print "--- final day ---"
 		self.display(state)
 
 	def __init__(self):
