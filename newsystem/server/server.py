@@ -141,7 +141,7 @@ class QuantumState:
 		return self.status[id]
 
 	def __repr__(self):
-		d = qwl.Dictionary()
+		d = qwl.it
 		r = [False for i in xrange(qwr.ROLE_WEREWOLF+1)]
 		s = '%d states\n\nG Morte\tMorto\t' % len(self)
 		for i in xrange(1,qwr.ROLE_WEREWOLF):
@@ -256,9 +256,9 @@ class DataBase:
 	# return the first game that is not already started
 	def pop(self):
 		for g in self.games.select().execute().fetchall():
-			if g[0][0] not in self.actives:
-				self.actives.add(g[0][0])
-				return Village(self,g[0][0])
+			if g[0] not in self.actives:
+				self.actives.add(g[0])
+				return Village(self,g[0])
 		return None
 	# discard a game that is ended
 	def drop(self,id):
@@ -290,6 +290,7 @@ class Village:
 		self.players = []
 		self.countdown = None
 		self.ballot = []
+		self.name = db.games.select(db.games.c.id==id).execute().fetchall()[0][1]
 		self.limit_day = db.games.select(db.games.c.id==id).execute().fetchall()[0][7]
 		self.limit_night = db.games.select(db.games.c.id==id).execute().fetchall()[0][8]
 		self.tie_draw = db.games.select(db.games.c.id==id).execute().fetchall()[0][11]
@@ -304,7 +305,7 @@ class Village:
 	# the village is updated
 	def __call__(self):
 		if self.state == None:
-			if read_roles():
+			if self.read_roles():
 				random.setstate(self.rseed)
 				if self.limit_day is not None and self.limit_night is not None:
 					self.countdown = int(time.time()) + self.limit_day + self.limit_night
@@ -329,8 +330,8 @@ class Village:
 			return True
 		if self.end_game():
 			return time.time() > self.countdown
-		a = None
-		if time.time() < self.countdown and not read_actions(a):
+		a = [[None for j in xrange(qwr.ROLE_WEREWOLF+1)] for i in xrange(len(self.players))]
+		if not self.read_actions(a) and time.time() < self.countdown:
 			return False
 		if self.phase == qwr.PHASE_DAY:
 			random.setstate(self.rseed)
@@ -384,13 +385,12 @@ class Village:
 		return True
 	# read the actions of the corresponding day and village, returns false if people missing
 	def read_actions(self, actions):
-		actions = [[None for j in xrange(qwr.ROLE_WEREWOLF+1)] for i in xrange(len(self.players))]
 		d = {}
 		for p in xrange(len(self.players)):
 			d[self.players[p]] = p
 		done = True
 		for p in self.players:
-			for i in self.db.actions.select().where(day==self.state.day).where(player_id==p).execute().fetchall():
+			for i in self.db.actions.select().where(self.db.actions.c.day==self.state.day).where(self.db.actions.c.player_id==p).execute().fetchall():
 				actions[d[p]][i[3]] = d[i[4]]
 			for i in xrange(qwr.ROLE_WEREWOLF+1):
 				if qwr.ROLE_DESC[i][1] in [qwr.ROLE_MEASURE, qwr.ROLE_TRANSFORM] and actions[d[p]][i] is None and self.state[d[p]][qwr.STATUS_ROLE][i] > 0:
@@ -400,35 +400,35 @@ class Village:
 	def write_status(self):
 		for i in xrange(len(self.players)):
 			for j in xrange(qwr.ROLE_WEREWOLF+2):
-				self.db.status.update.where(self.db.status.c.player_id==self.players[i]).where(self.db.status.c.status_type==qwr.STATUS_ROLE).where(self.db.status.c.value_id==j).execute(probability=self.state[i][qwr.STATUS_ROLE][j]/float(len(self.state)))
+				self.db.status.update().where(self.db.status.c.player_id==self.players[i]).where(self.db.status.c.status_type==qwr.STATUS_ROLE).where(self.db.status.c.value_id==j).execute(probability=self.state[i][qwr.STATUS_ROLE][j]/float(len(self.state)))
 			for j in xrange(len(self.players)):
-				self.db.status.update.where(self.db.status.c.player_id==self.players[i]).where(self.db.status.c.status_type==qwr.STATUS_WOLFRIEND).where(self.db.status.c.value_id==self.players[j]).execute(probability=self.state[i][qwr.STATUS_WOLFRIEND][j]/float(len(self.state)))
-			self.db.status.update.where(self.db.status.c.player_id==self.players[i]).where(self.db.status.c.status_type==qwr.STATUS_DEATHDAY).execute(probability=self.state[i][qwr.STATUS_DEATHDAY]/float(len(self.state)))
+				self.db.status.update().where(self.db.status.c.player_id==self.players[i]).where(self.db.status.c.status_type==qwr.STATUS_WOLFRIEND).where(self.db.status.c.value_id==self.players[j]).execute(probability=self.state[i][qwr.STATUS_WOLFRIEND][j]/float(len(self.state)))
+			self.db.status.update().where(self.db.status.c.player_id==self.players[i]).where(self.db.status.c.status_type==qwr.STATUS_DEATHDAY).execute(probability=self.state[i][qwr.STATUS_DEATHDAY]/float(len(self.state)))
 	# check the pool, lynch the winner and return false if tied
 	def lynch(self, votes):
 		res = [[1] for i in votes]
 		for v in xrange(len(votes)):
 			# solo in questo caso il voto e' valido
-			if votes[v][1] is not None and (self.ballot == [] or votes[v][1] in self.ballot) and self.state[v][qwr.STATUS_ROLE][qwr.ROLE_DEAD] < len(state) and self.state[votes[v][1]][qwr.STATUS_ROLE][qwr.ROLE_DEAD] < len(state):
+			if votes[v][1] is not None and (self.ballot == [] or votes[v][1] in self.ballot) and self.state[v][qwr.STATUS_ROLE][qwr.ROLE_DEAD] < len(self.state) and self.state[votes[v][1]][qwr.STATUS_ROLE][qwr.ROLE_DEAD] < len(self.state):
 				res[votes[v][1]] += [v]
 				res[votes[v][1]][0] += 1
 		txt = [[res[i][0]-1,i] for i in xrange(len(res))]
 		txt.sort()
-		txt = '\n'.join(['%s:\t%d (%s)' % (self.db.name(self.players[v[1]]),v[0],', '.join([self.db.name(self.players[i]) for i in res[v[1]][1:]])) for v in txt])
+		txt = '#'.join(['%s:\t%d (%s)' % (self.db.name(self.players[v[1]]),v[0],', '.join([self.db.name(self.players[i]) for i in res[v[1]][1:]])) for v in txt])
 		win = [i for i in xrange(len(res)) if len(res[i]) == max(res)[0]]
 		if len(win) > 1 and (self.tie_conclave or (self.tie_play_off and self.ballot == [])):
 			if self.tie_play_off:
 				self.ballot = win
-			txt = 'self.phrases[self.PHRASE_BALLOT]\n' + txt
-			self.db.logs.insert().execute(day=self.state.day,content=txt)
+			txt = "self.phrases[self.PHRASE_BALLOT] + '#" + txt + "'"
+			self.db.logs.insert().execute(day=self.state.day,player_id=-self.id,content=txt)
 			return False
 		if len(win) == 1 or self.tie_draw:
 			win = random.choice(win)
 			self.state.lynch(win)
-			txt = 'self.phrases[self.PHRASE_LYNCH] %% (%s)\n' % self.db.name(self.players[win]) + txt
+			txt = "self.phrases[self.PHRASE_LYNCH] %% '%s' + '#" % self.db.name(self.players[win]) + txt + "'"
 		else:
-			txt = 'self.phrases[self.PHRASE_NOLYNCH]\n' + txt
-		self.db.logs.insert().execute(day=self.state.day,content=txt)
+			txt = "self.phrases[self.PHRASE_NOLYNCH] + '#" + txt + "'"
+		self.db.logs.insert().execute(day=self.state.day,player_id=-self.id,content=txt)
 		return True
 	# apply the actions taken by night
 	def apply(self, actions):
@@ -440,12 +440,12 @@ class Village:
 			for i in l:
 				if self.state[i[0]][qwr.STATUS_ROLE][i[1]] > 0:
 					res = self.state.act(actions, i[0], i[1], i[2])
-					txt = 'self.phrases[dict.PHRASE_ACTION] %% (%s, self.actions[%d], %s)' % (self.db.name(self.players[i[0]]), i[1], self.db.name(self.players[i[2]]))
+					txt = "self.phrases[self.PHRASE_ACTION] %% (self.actions[%d], '%s')" % (i[1], self.db.name(self.players[i[2]]))
 					if isinstance(res,bool):
 						txt += ' + self.phrases[self.PHRASE_TRUE]' if res else ' + self.phrases[self.PHRASE_FALSE]'
 					elif isinstance(res,int):
-						txt += ' + self.phrases[self.PHRASE_ID] %% (%s)' % self.db.name(self.players[res])
-					txt += '.'
+						txt += " + self.phrases[self.PHRASE_ID] %% '%s'" % self.db.name(self.players[res])
+					txt += " + '.'"
 					self.db.logs.insert().execute(day=self.state.day,player_id=self.players[i[0]],content=txt)
 	# return wether the game is finished
 	def end_game(self):
@@ -475,7 +475,11 @@ if __name__ == '__main__':
 #################################
 
 
-class dQS():
+if __name__ != '__main__':
+	import localization as qwl
+
+
+class dQS:
 	def display(self,state):
 		i = -3
 		for l in repr(state).split('\n'):
@@ -491,7 +495,7 @@ class dQS():
 			i += 1
 
 	def __call__(self,N):
-		d = qwl.Dictionary()
+		d = qwl.it
 		if isinstance(N,int):
 			roles = [random.randint(-qwr.ROLE_WEREWOLF+1,qwr.ROLE_WEREWOLF-1) for i in range(N-N/3)] + [qwr.ROLE_WEREWOLF * (2*random.randint(0,1)-1) for i in range(N/3)]
 		else:
@@ -541,5 +545,93 @@ class dQS():
 		self.active  = [i for i in xrange(qwr.ROLE_WEREWOLF+1) if qwr.ROLE_DESC[i][1] in [qwr.ROLE_MEASURE,qwr.ROLE_TRANSFORM]]
 		self.names = ['Ammalia','Brumo','Carna','Darlo','Elica','Fascio','Gorgo','Hanno','Iene','Lucca','Marcio','Nicolla','Orario','Pallo','Quisto','Rodeo','Sana','Tiziamo','Uggio','Vanesio','Zorro']
 
+
+class dDB:
+	def __init__(self):
+		self.db = DataBase(db_url.url, False)
+	def __iadd__(self,n):
+		for i in xrange(n):
+			self.db.players.insert().execute(name=self.randname(i),mail=(self.randstr()+'.'+self.randstr()+'@'+self.randstr()+'.com'),password=self.randstr())
+		return self
+	def __call__(self):
+		d = qwl.it
+		villages = []
+		while True:
+			villages += [self.db.pop()]
+			if villages[-1] == None:
+				villages.pop()
+			for v in villages:
+				if (v.state is not None):
+					print "\n===============================\nVillaggio %s" % v.name
+					print "--- %s %d ---" % ('giorno' if v.phase == qwr.PHASE_DAY else 'notte', v.state.day)
+					self.display(v)
+				if v():
+					print "\nHANNO VINTO I %s!\n" % ('VILLICI' if v.state.winner() else 'LUPI')
+					print "--- final day ---"
+					self.display(v)
+					self.db.drop(v.id)
+					villages.remove(v)
+				if v.phase == qwr.PHASE_DAY and v.state is not None:
+					if v.state.day == 1:
+						print "\n===============================\nVillaggio %s" % v.name
+						print "--- %s %d ---" % ('giorno' if v.phase == qwr.PHASE_DAY else 'notte', v.state.day)
+						self.display(v)
+					for i in self.db.logs.select(self.db.logs.c.day==v.state.day-1).execute().fetchall():
+						if i[2] in v.players:
+							print "[%s] %s" % (self.db.name(i[2]), d(i[3]))
+				elif v.state is not None:
+					for i in self.db.logs.select(self.db.logs.c.day==v.state.day).execute().fetchall():
+						if i[2] == -v.id:
+							print "[Day %d]" % v.state.day, '\n'.join(d(i[3]).split('#'))
+	def display(self,vill):
+		i = -3
+		for l in repr(vill.state).split('\n'):
+			f = l
+			if i == -1:
+				f = '\t' + f + '\t\t' + '\t'.join([self.db.name(vill.players[j]).split(' ')[0] for j in range(vill.state.N)])
+			if i >= 0:
+				f = self.db.name(vill.players[i]).split(' ')[0] + '\t' + f
+			if len(f.split('\t')) > 22:
+				print '\t'.join(f.split('\t')[:22])
+			else:
+				print f
+			i += 1
+	def newgame(self,n):
+		if isinstance(n,int):
+			roles = [random.randint(-qwr.ROLE_WEREWOLF+1,qwr.ROLE_WEREWOLF-1) for i in range(n-n/3)] + [qwr.ROLE_WEREWOLF * (2*random.randint(0,1)-1) for i in range(n/3)]
+			random.shuffle(roles)
+		else:
+			roles = n
+			n = len(roles)
+		players = [int(i[0]) for i in self.db.players.select(self.db.players.c.game_id==None).execute().fetchall()]
+		if len(players) > n:
+			players = random.sample(players,n)
+		else:
+			n = len(players)
+			roles = roles[:n]
+		players.sort()
+		gid = random.choice(players)
+		self.db.games.insert().execute(name=self.randgame(),password=self.randstr(),admin_id=gid,limit_day=0,limit_night=0,max_players=n,max_states=100000,tie_draw=random.choice([True,False]),tie_play_off=random.choice([True,False]),tie_conclave=random.choice([True,False]))
+		gid = self.db.games.select(self.db.games.c.admin_id==gid).execute().fetchall()[0][0]
+		for i in players:
+			self.db.players.update(self.db.players.c.id==i).execute(game_id=gid)
+		for i in roles:
+			self.db.villages.insert().execute(game_id=gid,role_id=abs(i),is_quantum=i<0)
+		for i in xrange(20):
+			for p in xrange(n):
+				for r in xrange(1,qwr.ROLE_WEREWOLF+1):
+					if random.randint(0,i*i+20) <= 20:
+						self.db.actions.insert().execute(day=i+1,player_id=players[p],role_id=r,target_id=players[randiff(n,[p])])
+	def randgame(self):
+		return random.choice(['Col','Pra','Pian','Mon','Stra','Val']) + ''.join(random.choice(['pantan','sec','stort','salic','bel','mal','sul','viv','sol','lun','chiar','scur','fluvi','ari','os','buon','de','di','le','la','tra','fra','con']) for i in xrange(random.randint(2,4)/2)) + random.choice('aeioo')
+	def randstr(self):
+		return ''.join(''.join(random.choice('bccddfglllmnnnprrrsstttv') for j in xrange(random.randint(1,4)/2))+random.choice('aaaaeeeeiiiioou') for i in xrange(random.randint(2,6)))
+	def randname(self,i):
+		names = ['Ammalia','Brumo','Carna','Darlo','Elica','Fascio','Gorgo','Hanno','Iene','Lucca','Marcio','Nicolla','Orario','Pallo','Quisto','Rodeo','Sana','Tiziamo','Uggio','Vanesio','Zorro']
+		name = self.randstr()
+		return names[i] + ' ' + name[0].upper() + name[1:]
+
+
 if __name__ != '__main__':
-	d = dQS()
+	dq = dQS()
+	db = dDB()

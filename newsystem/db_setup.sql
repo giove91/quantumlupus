@@ -107,7 +107,7 @@ CREATE TABLE actions (
 CREATE TABLE logs (
 	id INT NOT NULL auto_increment,
 	day INT NOT NULL,
-	player_id INT,
+	player_id INT NOT NULL,
 	content VARCHAR(256) NOT NULL,
 	PRIMARY KEY (id)
 	) DEFAULT CHARSET=utf8;
