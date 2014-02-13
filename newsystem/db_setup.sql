@@ -24,6 +24,13 @@
 -- ROLE_WEREWOLF	13
 -- -------------------
 
+-- la partita si considera killata se admin_id < 0.
+-- la partita si considera non iniziata se day = 0.
+-- il server inizia automaticamente la partita se ci sono ruoli per tutti i giocatori (o per max_players giocatori).
+-- tie_draw significa che in caso di pareggio vi e' sorteggio, tie_ballot significa che si procede a un ballottaggio.
+-- tie_conclave significa che in caso di pareggio si procede a oltranza. se ballot e' attivo, ogni volta diminuisce il numero di giocatori votabili.
+-- in logs, player_id == NULL vuol dire log pubblico
+
 
 DROP DATABASE IF EXISTS quantum_werewolves;
 CREATE DATABASE quantum_werewolves;
@@ -55,6 +62,7 @@ CREATE TABLE games (
 CREATE TABLE players (
 	id INT NOT NULL auto_increment,
 	name VARCHAR(256) NOT NULL,
+	mail VARCHAR(256) NOT NULL,
 	password VARCHAR(256) NOT NULL,
 	game_id INT,
 	PRIMARY KEY (id)
@@ -67,8 +75,7 @@ CREATE TABLE villages (
 	game_id INT NOT NULL,
 	role_id INT NOT NULL,
 	is_quantum BOOL NOT NULL DEFAULT FALSE,
-	num INT NOT NULL DEFAULT 1,
-	PRIMARY KEY (game_id)
+	num INT NOT NULL DEFAULT 1
 	);
 
 
@@ -78,8 +85,7 @@ CREATE TABLE status (
 	player_id INT NOT NULL,
 	status_type INT NOT NULL,
 	value_id INT NOT NULL,
-	probability DOUBLE NOT NULL,
-	PRIMARY KEY (player_id)
+	probability DOUBLE NOT NULL
 	);
 
 
@@ -100,7 +106,7 @@ CREATE TABLE actions (
 CREATE TABLE logs (
 	id INT NOT NULL auto_increment,
 	day INT NOT NULL,
-	player_id INT NOT NULL,
+	player_id INT,
 	content VARCHAR(256) NOT NULL,
 	PRIMARY KEY (id)
 	) DEFAULT CHARSET=utf8;

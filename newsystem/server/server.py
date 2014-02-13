@@ -2,7 +2,7 @@
 
 from sqlalchemy import *
 import sys, random, time
-import db_url, localization as qwl, ruleset as qwr
+import db_url, ruleset as qwr
 
 
 #################################
@@ -16,6 +16,7 @@ def randiff(N,v):
 	while r in v:
 		r = random.randint(0,N-1)
 	return r
+
 
 #################################
 #	permutations				#
@@ -250,12 +251,13 @@ class DataBase:
 		self.status.delete().execute()
 		self.actions.delete().execute()
 		self.logs.delete().execute()
+		self.players.update().execute(game_id=None)
 	# return the first game that is not already started
 	def pop(self):
 		for g in self.games.select().execute().fetchall():
-			if g[0] not in self.actives:
-				self.actives.add(g[0])
-				return Village(self,g[0])
+			if g[0][0] not in self.actives:
+				self.actives.add(g[0][0])
+				return Village(self,g[0][0])
 		return None
 	# discard a game that is ended
 	def drop(self,id):
@@ -267,6 +269,9 @@ class DataBase:
 			self.actions.delete(self.actions.c.player_id==p[0]).execute()
 			self.logs.delete(self.logs.c.player_id==p[0]).execute()
 		self.players.update(self.players.c.game_id==id).execute(game_id=None)
+	# return the player name given the id
+	def name(self,id):
+		return "Puppo"
 
 
 #################################
@@ -278,12 +283,12 @@ class Village:
 	def __init__(self,db,id):
 		self.db = db
 		self.id = id
-		self.day = 1
-		self.phase = qwr.PHASE_NIGHT
+		self.phase = 1
 		self.state = None
 		self.roles = []
 		self.players = []
 		self.countdown = None
+		self.ballot = []
 		self.limit_day = db.games.select(db.games.c.id==id).execute().fetchall()[0][7]
 		self.limit_night = db.games.select(db.games.c.id==id).execute().fetchall()[0][8]
 		self.tie_draw = db.games.select(db.games.c.id==id).execute().fetchall()[0][11]
@@ -299,37 +304,54 @@ class Village:
 				else:
 					self.countdown = int(time.time()) + 1000000
 				self.db.games.update(self.db.games.c.id==self.id).execute(day=1)
-				self.db.games.update(self.db.games.c.id==self.id).execute(phase=PHASE_NIGHT)
+				self.db.games.update(self.db.games.c.id==self.id).execute(phase=qwr.PHASE_NIGHT)
 				max_states = self.db.games.select(self.db.games.c.id==self.id).execute().fetchall()[0][10]
 				self.state = QuantumState(self.roles,max_states)
+				for i in xrange(len(self.players)):
+					for j in xrange(qwr.ROLE_WEREWOLF+2):
+						self.db.status.insert().execute(player_id=self.players[i],status_type=qwr.STATUS_ROLE,value_id=j,probability=0)
+					for j in xrange(len(self.players)):
+						self.db.status.insert().execute(player_id=self.players[i],status_type=qwr.STATUS_WOLFRIEND,value_id=self.players[j],probability=0)
+					self.db.status.insert().execute(player_id=self.players[i],status_type=qwr.STATUS_DEATHDAY,value_id=0,probability=0)
 				self.write_status()
-			return False
+			else:
+				return False
+		if self.db.games.select(self.db.games.c.id==self.id).execute().fetchall()[0][3] < 0:
+			return True
+		if self.end_game():
+			return time.time() > self.countdown
 		a = None
 		if time.time() < self.countdown and not read_actions(a):
 			return False
 		if self.phase == qwr.PHASE_DAY:
-			self.lynch(a)
+			if not self.lynch(a):
+				self.db.actions.delete(self.db.actions.c.day==self.state.day)
+				if self.limit_day is not None:
+					self.countdown = int(time.time()) + self.limit_day
+					self.db.games.update(self.db.games.c.id==self.id).execute(countdown=self.countdown)
+				else:
+					self.countdown = int(time.time()) + 1000000
+				return False
 			self.phase = qwr.PHASE_NIGHT
-			self.db.games.update(self.db.games.c.id==self.id).execute(phase=PHASE_NIGHT)
+			self.db.games.update(self.db.games.c.id==self.id).execute(phase=qwr.PHASE_NIGHT)
 			if self.limit_night is not None:
 				self.countdown = int(time.time()) + self.limit_night
 				self.db.games.update(self.db.games.c.id==self.id).execute(countdown=self.countdown)
 			else:
 				self.countdown = int(time.time()) + 1000000
-			return self.end
+			return False
 		if self.phase == qwr.PHASE_NIGHT:
-			self.measure(a)
-			self.transform(a)
-			self.day += 1
+			self.apply(a)
+			self.state += 1
 			self.phase = qwr.PHASE_DAY
-			self.db.games.update(self.db.games.c.id==self.id).execute(day=self.day)
-			self.db.games.update(self.db.games.c.id==self.id).execute(phase=PHASE_DAY)
+			self.db.games.update(self.db.games.c.id==self.id).execute(day=self.state.day)
+			self.db.games.update(self.db.games.c.id==self.id).execute(phase=qwr.PHASE_DAY)
 			if self.limit_day is not None:
 				self.countdown = int(time.time()) + self.limit_day
 				self.db.games.update(self.db.games.c.id==self.id).execute(countdown=self.countdown)
 			else:
 				self.countdown = int(time.time()) + 1000000
-			return self.end
+			return False
 	# read roles present and players subscribed, and check weather there are all of them
 	def read_roles(self):
 		self.players = [i[0] for i in self.db.players.select(self.db.players.c.game_id==self.id).execute().fetchall()]
@@ -347,215 +369,98 @@ class Village:
 		if len(self.roles) > len(self.players):
 			self.roles = self.roles[:len(self.players)]
 		return True
-	# read the actions of the corresponding day and village AAAAAAAAAAAAA
+	# read the actions of the corresponding day and village, returns false if people missing
 	def read_actions(self, actions):
-		r = [None for i in self.players]
+		actions = [[None for j in xrange(qwr.ROLE_WEREWOLF+1)] for i in xrange(len(self.players))]
+		d = {}
+		for p in xrange(len(self.players)):
+			d[self.players[p]] = p
 		done = True
 		for p in self.players:
-			t = self.db.actions.select().where(day==self.day).where(player_id==p).execute().fetchall()
-			t = [i[3:] for i in t]
-			r[p] = t
+			for i in self.db.actions.select().where(day==self.state.day).where(player_id==p).execute().fetchall():
+				actions[d[p]][i[3]] = d[i[4]]
+			for i in xrange(qwr.ROLE_WEREWOLF+1):
+				if qwr.ROLE_DESC[i][1] in [qwr.ROLE_MEASURE, qwr.ROLE_TRANSFORM] and actions[d[p]][i] is None and self.state[d[p]][qwr.STATUS_ROLE][i] > 0:
+					done = False
+		return done
 	# write the status of the village in table "status"
 	def write_status(self):
-		pass
+		for i in xrange(len(self.players)):
+			for j in xrange(qwr.ROLE_WEREWOLF+2):
+				self.db.status.update.where(self.db.status.c.player_id==self.players[i]).where(self.db.status.c.status_type==qwr.STATUS_ROLE).where(self.db.status.c.value_id==j).execute(probability=self.state[i][qwr.STATUS_ROLE][j]/float(len(self.state)))
+			for j in xrange(len(self.players)):
+				self.db.status.update.where(self.db.status.c.player_id==self.players[i]).where(self.db.status.c.status_type==qwr.STATUS_WOLFRIEND).where(self.db.status.c.value_id==self.players[j]).execute(probability=self.state[i][qwr.STATUS_WOLFRIEND][j]/float(len(self.state)))
+			self.db.status.update.where(self.db.status.c.player_id==self.players[i]).where(self.db.status.c.status_type==qwr.STATUS_DEATHDAY).execute(probability=self.state[i][qwr.STATUS_DEATHDAY]/float(len(self.state)))
+	# check the pool, lynch the winner and return false if tied
 	def lynch(self, votes):
-		pass
-	def measure(self, actions):
-		pass
-	def transform(self, actions):
-		pass
-	def end_game(self):
+		res = [[1] for i in votes]
+		for v in xrange(len(votes)):
+			# solo in questo caso il voto e' valido
+			if votes[v][1] is not None and (self.ballot == [] or votes[v][1] in self.ballot) and self.state[v][qwr.STATUS_ROLE][qwr.ROLE_DEAD] < len(state) and self.state[votes[v][1]][qwr.STATUS_ROLE][qwr.ROLE_DEAD] < len(state):
+				res[votes[v][1]] += [v]
+				res[votes[v][1]][0] += 1
+		txt = [[res[i][0]-1,i] for i in xrange(len(res))]
+		txt.sort()
+		txt = '\n'.join(['%s:\t%d (%s)' % (self.db.name(self.players[v[1]]),v[0],', '.join([self.db.name(self.players[i]) for i in res[v[1]][1:]])) for v in txt])
+		win = [i for i in xrange(len(res)) if len(res[i]) == max(res)[0]]
+		if len(win) > 1 and (self.tie_conclave or (self.tie_play_off and self.ballot == [])):
+			if self.tie_play_off:
+				self.ballot = win
+			txt = 'dict.phrases[dict.PHRASE_BALLOT]\n' + txt
+			self.db.logs.insert().execute(day=self.state.day,content=txt)
+			return False
+		if len(win) == 1 or self.tie_draw:
+			win = random.choice(win)
+			self.state.lynch(win)
+			txt = 'dict.phrases[dict.PHRASE_LYNCH] %% (%s)\n' % self.db.name(self.players[win]) + txt
+		else:
+			txt = 'dict.phrases[dict.PHRASE_NOLYNCH]\n' + txt
+		self.db.logs.insert().execute(day=self.state.day,content=txt)
 		return True
+	# apply the actions taken by night
+	def apply(self, actions):
+		for p in xrange(qwr.PRIORITY_MAX):
+			r = [i for i in xrange(qwr.ROLE_WEREWOLF+1) if qwr.ROLE_DESC[i][0] == p]
+			l = [[[i,j,actions[i][j]] for j in r if actions[i][j] is not None] for i in xrange(len(self.players))]
+			l = sum(l,[])
+			random.shuffle(l)
+			for i in l:
+				if self.state[i[0]][qwr.STATUS_ROLE][i[1]] > 0:
+					res = self.state.act(actions, i[0], i[1], i[2])
+					txt = 'dict.phrases[dict.PHRASE_ACTION] %% (%s, dict.actions[%d], %s)' % (self.db.name(self.players[i[0]]), i[1], self.db.name(self.players[i[2]]))
+					if isinstance(res,bool):
+						txt += ' + dict.phrases[dict.PHRASE_TRUE]' if res else ' + dict.phrases[dict.PHRASE_FALSE]'
+					elif isinstance(res,int):
+						txt += ' + dict.phrases[dict.PHRASE_ID] %% (%s)' % self.db.name(self.players[res])
+					txt += '.'
+					self.db.logs.insert().execute(day=self.state.day,player_id=self.players[i[0]],content=txt)
+	# return wether the game is finished
+	def end_game(self):
+		return self.state.winner() is not None
+
+
+#################################
+#	Main						#
+#################################
+
+
+if __name__ == '__main__':
+	db = DataBase(db_url.url)
+	villages = []
+	while True:
+		villages += [db.pop()]
+		if villages[-1] == None:
+			villages.pop()
+		for v in villages:
+			if v():
+				db.drop(v.id)
+				villages.remove(v)
 
 
 #################################
 #	Debug						#
 #################################
 
-
-# classe che si interfaccia con il database
-class DataBaseOld:
-	def get_player_name(self,id):
-		# guarda il nome nella tabella players
-		return self.players.select(self.players.c.id==id+1).execute().fetchall()[0][1]
-
-	def initial_state(self):
-		# restituisce lo stato iniziale
-		NC = self.game.select(self.game.c.role_id==2).execute().fetchall()[0][1]
-		NV = self.game.select(self.game.c.role_id==3).execute().fetchall()[0][1]
-		NG = self.game.select(self.game.c.role_id==4).execute().fetchall()[0][1]
-		NL = self.game.select(self.game.c.role_id==5).execute().fetchall()[0][1]
-		N = NC + NV + NG + NL
-		return QuantumState(N,NV,NG,NL)
-	
-	def update_waves(self):
-		# aggiorna la tabella waves e death di players
-		for i in range(state.N):
-			for j in range(1,6):
-				p = state[i][j]/float(len(state))
-				self.waves.update().where(self.waves.c.player_id==i+1).where(self.waves.c.role_id==j).execute(probability=p)
-				self.players.update(self.players.c.id==i+1).execute(death=(0 if state[i][1] < len(state) else 10*state[i][0]/state[i][1]))
-
-	def get_actions(self):
-		# restituisce le azioni inserite nel giorno di oggi
-		r = self.actions.select(self.actions.c.day==day).execute().fetchall()
-		return reversed([[a[1]-1,a[2],a[3]-1] for a in r])
-
-	def turn_done(self,phase):
-		# controlla se tutti hanno fatto le loro azioni
-		for i in range(state.N):
-			if state[i][1] < len(state):
-				if phase and len(self.actions.select().where(self.actions.c.player_id==i+1).where(self.actions.c.type==1).where(self.actions.c.day==day).execute().fetchall()) == 0:
-					return False
-				for j in range(1,4):
-					if not phase and state[i][j+2] > 0 and len(self.actions.select().where(self.actions.c.player_id==i+1).where(self.actions.c.type==j%3+2).where(self.actions.c.day==day).execute().fetchall()) == 0:
-						return False
-		return True
-
-	def end_game(self):
-		# logga le informazioni sul fine partita
-		result = False
-		logtext = ''
-		imax=False
-		for i in range(state.N):
-			if state.quantum[0][i][1] == 0:
-				imax = True
-				if state.quantum[0][i][0] > 4:
-					result = True
-		if not imax:
-			imax=0
-			for i in range(1,state.N):
-				if state.quantum[0][i][1] > state.quantum[0][imax][1]:
-					imax=i
-			result = (state.quantum[0][imax][0] > 4)
-		self.logs.insert().execute(player_id=0,day=day,content='La partita e\' finita e hanno vinto i %s!!  Hanno giocato:' % ('lupi' if result else 'villici'))
-		for i in range(state.N):
-			self.logs.insert().execute(player_id=0,day=day,content='%s (%s)' % (self.get_player_name(i),roles[state.quantum[0][i][0]]))
-
-	def vote(self,votes):
-		# esamina i voti, lincia e compila il log
-		done = [False for i in range(state.N)]
-		nvot = [[] for i in range(state.N)]
-		for v in votes:
-			if v[1] == 1 and not done[v[0]] and state[v[0]][1] < len(state) and state[v[2]][1] < len(state):
-				nvot[v[2]].append(v[0])
-				done[v[0]] = True
-		winners = []
-		maxv = max([len(i) for i in nvot])
-		for i in range(state.N):
-			if len(nvot[i]) == maxv:
-				winners += [i]
-		kill = random.choice(winners)
-		self.logs.insert().execute(player_id=0,day=day,content='Il giocatore %s e\' stato linciato, rivelandosi un %s.' % (self.get_player_name(kill), ('lupo' if state.lynch(kill) else 'villico')))
-		for i in range(state.N):
-			if len(nvot[i]) > 0:
-				logtext = 'Voti per %s  (TOT %d):  ' % (self.get_player_name(i),len(nvot[i]))
-				for v in nvot[i]:
-					logtext += ' %s' % self.get_player_name(v)
-				self.logs.insert().execute(player_id=0,day=day,content=logtext)
-
-	def check_seerings(self,actions):
-		# esegue in ordine casuale gli scrutamenti
-		random.shuffle(actions)
-		done = [False for i in range(state.N)]
-		for a in actions:
-			if a[1] == 3 and not done[a[0]]:
-				self.logs.insert().execute(player_id=a[0]+1,day=day,content='Hai scrutato %s ed e\' risultato un %s.' % (self.get_player_name(a[2]), ('lupo' if state.seer(a[0],a[2]) else 'villico')) )
-				done[a[0]] = True
-
-	def log_actions(self, actions):
-		done = [[False,False] for i in range(state.N)]
-		for a in actions:
-			if (a[1] == 2 or a[1] == 4) and not done[a[0]][a[1]/2-1]:
-				self.logs.insert().execute(player_id=a[0]+1,day=day,content='Hai %s %s.' % (('sbranato' if a[1] == 2 else 'protetto'), self.get_player_name(a[2])) )
-
-	def clear(self):
-		# pulisco il database e chiedo come ricostruirlo
-		print "Attesa connessioni (premere invio per cominciare la partita)...",
-		sys.stdin.readline()
-		db.time.insert().execute(day=1,phase=1)
-		N = len(self.players.select().execute().fetchall())
-		print "Numero di veggenti: ",
-		NV = int(sys.stdin.readline())
-		print "Numero di guardie: ",
-		NG = int(sys.stdin.readline())
-		print "Numero di lupi: ",
-		NL = int(sys.stdin.readline())
-		print "Stati iniziali (vuoto per tutti gli stati)",
-		k = sys.stdin.readline()[:-1]
-		if k == '':
-			k = 2.0
-		else:
-			k = eval(k)
-		NC = N - NV - NG - NL
-		self.game.insert().execute(role_id=2,num=NC)
-		self.game.insert().execute(role_id=3,num=NV)
-		self.game.insert().execute(role_id=4,num=NG)
-		self.game.insert().execute(role_id=5,num=NL)
-		for i in range(1,5):
-			self.roles.insert().execute(id=i,name=roles[i])
-		self.roles.insert().execute(id=5,name='Lupo')
-		for i in range(N):
-			for j in range(1,6):
-				self.waves.insert().execute(player_id=i+1,role_id=j,probability=0.0)
-		global state
-		state = QuantumState(N,NV,NG,NL,k)
-		self.update_waves()
-
-
-if __name__ == '__main__' and False:
-	db = DataBase(dburl.url)
-	if not (len(sys.argv) > 1 and sys.argv[1] == '-c'):
-		db.clear()
-	else:
-		db.logs.delete().execute()
-		state = db.initial_state()
-
-	for x in range(1,state.N):
-		day = x
-		if day > 1:
-			# giorno!
-			db.time.delete().execute()
-			db.time.insert().execute(day=day,phase=1)
-			counter = 0
-			while not db.turn_done(True) and counter < 150:
-				time.sleep(2)
-				counter += 1
-			a = db.get_actions()
-			db.log_actions(a)
-			db.vote(a)
-			db.update_waves()
-			if state.finished():
-				db.end_game()
-				db.update_waves()
-				break
-		print state
-		# print state.quantum
-		# notte!
-		db.time.delete().execute()
-		db.time.insert().execute(day=day,phase=2)
-		counter = 0
-		while not db.turn_done(False) and counter < 60:
-			time.sleep(2)
-			counter += 1
-		a = db.get_actions()
-		db.log_actions(a)
-		db.check_seerings(a)
-		state.bite(a)
-		db.update_waves()
-		if state.finished():
-			db.end_game()
-			db.update_waves()
-			break
-		print state
-		# print state.quantum
-	print state
-	# print state.quantum
-
-# logs.insert().execute(content='nuovo contenuto')
-# logs.delete(logs.c.player_id==1).execute()
-# logs.update(logs.c.player_id==2).execute(content='Nuovo contenuto')
-# logs.select(logs.c.player_id==2).execute().fetchall()
 
 class dQS():
 	def display(self,state):
