@@ -236,7 +236,7 @@ class QuantumState:
 
 class DataBase:
 	# init the database taken from a certain url
-	def __init__(self,url):
+	def __init__(self,url,cont):
 		self.actives = set()
 		self.db = create_engine(url)
 		self.md = MetaData(self.db)
@@ -246,12 +246,13 @@ class DataBase:
 		self.status   = Table('status',   self.md, autoload=True)
 		self.actions  = Table('actions',  self.md, autoload=True)
 		self.logs	 = Table('logs',	 self.md, autoload=True)
-		self.games.delete().execute()
-		self.villages.delete().execute()
+		if not cont:
+			self.games.delete().execute()
+			self.villages.delete().execute()
+			self.actions.delete().execute()
+			self.players.update().execute(game_id=None)
 		self.status.delete().execute()
-		self.actions.delete().execute()
 		self.logs.delete().execute()
-		self.players.update().execute(game_id=None)
 	# return the first game that is not already started
 	def pop(self):
 		for g in self.games.select().execute().fetchall():
@@ -294,10 +295,17 @@ class Village:
 		self.tie_draw = db.games.select(db.games.c.id==id).execute().fetchall()[0][11]
 		self.tie_play_off = db.games.select(db.games.c.id==id).execute().fetchall()[0][12]
 		self.tie_conclave = db.games.select(db.games.c.id==id).execute().fetchall()[0][13]
+		self.seed = db.games.select(db.games.c.id==id).execute().fetchall()[0][14]
+		if self.seed == 0:
+			self.seed = int(time.time()) % 1000000
+		db.games.update(db.games.c.id==id).execute(seed=self.seed)
+		random.seed(self.seed)
+		self.rseed = random.getstate()
 	# the village is updated
 	def __call__(self):
 		if self.state == None:
 			if read_roles():
+				random.setstate(self.rseed)
 				if self.limit_day is not None and self.limit_night is not None:
 					self.countdown = int(time.time()) + self.limit_day + self.limit_night
 					self.db.games.update(self.db.games.c.id==self.id).execute(countdown=self.countdown)
@@ -314,6 +322,7 @@ class Village:
 						self.db.status.insert().execute(player_id=self.players[i],status_type=qwr.STATUS_WOLFRIEND,value_id=self.players[j],probability=0)
 					self.db.status.insert().execute(player_id=self.players[i],status_type=qwr.STATUS_DEATHDAY,value_id=0,probability=0)
 				self.write_status()
+				self.rseed = random.getstate()
 			else:
 				return False
 		if self.db.games.select(self.db.games.c.id==self.id).execute().fetchall()[0][3] < 0:
@@ -324,6 +333,7 @@ class Village:
 		if time.time() < self.countdown and not read_actions(a):
 			return False
 		if self.phase == qwr.PHASE_DAY:
+			random.setstate(self.rseed)
 			if not self.lynch(a):
 				self.db.actions.delete(self.db.actions.c.day==self.state.day)
 				if self.limit_day is not None:
@@ -339,8 +349,10 @@ class Village:
 				self.db.games.update(self.db.games.c.id==self.id).execute(countdown=self.countdown)
 			else:
 				self.countdown = int(time.time()) + 1000000
+			self.rseed = random.getstate()
 			return False
 		if self.phase == qwr.PHASE_NIGHT:
+			random.setstate(self.rseed)
 			self.apply(a)
 			self.state += 1
 			self.phase = qwr.PHASE_DAY
@@ -351,6 +363,7 @@ class Village:
 				self.db.games.update(self.db.games.c.id==self.id).execute(countdown=self.countdown)
 			else:
 				self.countdown = int(time.time()) + 1000000
+			self.rseed = random.getstate()
 			return False
 	# read roles present and players subscribed, and check weather there are all of them
 	def read_roles(self):
@@ -445,7 +458,7 @@ class Village:
 
 
 if __name__ == '__main__':
-	db = DataBase(db_url.url)
+	db = DataBase(db_url.url, len(sys.argv) > 1 and sys.argv[1] == '-c')
 	villages = []
 	while True:
 		villages += [db.pop()]
