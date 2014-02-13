@@ -271,7 +271,7 @@ class DataBase:
 		self.players.update(self.players.c.game_id==id).execute(game_id=None)
 	# return the player name given the id
 	def name(self,id):
-		return "Puppo"
+		return self.players.select(self.players.c.id==id).execute().fetchall()[0][1]
 
 
 #################################
@@ -406,15 +406,15 @@ class Village:
 		if len(win) > 1 and (self.tie_conclave or (self.tie_play_off and self.ballot == [])):
 			if self.tie_play_off:
 				self.ballot = win
-			txt = 'dict.phrases[dict.PHRASE_BALLOT]\n' + txt
+			txt = 'self.phrases[self.PHRASE_BALLOT]\n' + txt
 			self.db.logs.insert().execute(day=self.state.day,content=txt)
 			return False
 		if len(win) == 1 or self.tie_draw:
 			win = random.choice(win)
 			self.state.lynch(win)
-			txt = 'dict.phrases[dict.PHRASE_LYNCH] %% (%s)\n' % self.db.name(self.players[win]) + txt
+			txt = 'self.phrases[self.PHRASE_LYNCH] %% (%s)\n' % self.db.name(self.players[win]) + txt
 		else:
-			txt = 'dict.phrases[dict.PHRASE_NOLYNCH]\n' + txt
+			txt = 'self.phrases[self.PHRASE_NOLYNCH]\n' + txt
 		self.db.logs.insert().execute(day=self.state.day,content=txt)
 		return True
 	# apply the actions taken by night
@@ -427,11 +427,11 @@ class Village:
 			for i in l:
 				if self.state[i[0]][qwr.STATUS_ROLE][i[1]] > 0:
 					res = self.state.act(actions, i[0], i[1], i[2])
-					txt = 'dict.phrases[dict.PHRASE_ACTION] %% (%s, dict.actions[%d], %s)' % (self.db.name(self.players[i[0]]), i[1], self.db.name(self.players[i[2]]))
+					txt = 'self.phrases[dict.PHRASE_ACTION] %% (%s, self.actions[%d], %s)' % (self.db.name(self.players[i[0]]), i[1], self.db.name(self.players[i[2]]))
 					if isinstance(res,bool):
-						txt += ' + dict.phrases[dict.PHRASE_TRUE]' if res else ' + dict.phrases[dict.PHRASE_FALSE]'
+						txt += ' + self.phrases[self.PHRASE_TRUE]' if res else ' + self.phrases[self.PHRASE_FALSE]'
 					elif isinstance(res,int):
-						txt += ' + dict.phrases[dict.PHRASE_ID] %% (%s)' % self.db.name(self.players[res])
+						txt += ' + self.phrases[self.PHRASE_ID] %% (%s)' % self.db.name(self.players[res])
 					txt += '.'
 					self.db.logs.insert().execute(day=self.state.day,player_id=self.players[i[0]],content=txt)
 	# return wether the game is finished

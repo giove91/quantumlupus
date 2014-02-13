@@ -84,7 +84,7 @@ CREATE TABLE villages (
 CREATE TABLE status (
 	player_id INT NOT NULL,
 	status_type INT NOT NULL,
-	value_id INT NOT NULL,
+	value_id INT,
 	probability DOUBLE NOT NULL
 	);
 
