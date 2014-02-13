@@ -61,7 +61,7 @@ def next_permutation(s, start):
 #################################
 
 class QuantumState:
-	# inizializza uno stato quantistico con certi ruoli e un massss
+	# inizializza uno stato quantistico con certi ruoli e un massimo numero di stati
 	def __init__(self,roles, max_states = 1000000):
 		self.N = len(roles)
 		self.day = 1
