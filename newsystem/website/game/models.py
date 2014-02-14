@@ -10,7 +10,7 @@ class Player(models.Model):
 class Game(models.Model):
     name = models.CharField(max_length=256)
     password = models.CharField(max_length=256, null=True, blank=True)
-    admin = models.ForeignKey(Player, related_name='+')
+    admin = models.ForeignKey(User)
     
     day = models.IntegerField(default=0)
     phase = models.IntegerField(default=1)
