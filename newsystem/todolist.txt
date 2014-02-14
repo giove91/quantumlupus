@@ -15,24 +15,4 @@ DESCRIZIONE DATABASE
 	e quindi far sì che la partita possa cominciare
 -	il campo villages>is_quantum, se false indica un ruolo che non viene attribuito
 	in modo quantistico ma invece fissato all'inizio (se ne occupa il server comunque)
-
-
-
-OLD TODOLIST
-
-SERVER
-*  supporto player_id non in ordine
-*  corrispondenza ruolo_id e type
-*  aggiungere ruoli "amante, investigatore, stalker, medico, messia, cacciatore"
-*  aggiungere ruoli certi (ruoli assegnati con probabilità 1 a inizio partita)
-*  tradurre classe QuantumState in C++
-*  aggiungere supporto partite multiple
-
-CLIENT
-*  visualizzare ruoli presenti
-*  aggiungere a status personale "compagni lupi" con probabilità condizionate
-*  aggiungere a status personale "probabilità di essere lupo dominante"
-*  autorefresh
-*  status personale nascondibile
-*  avvio partita via web
-*  chat
+-	autorefresh? status personale nascondibile? chat?
