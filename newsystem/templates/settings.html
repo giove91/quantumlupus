@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% load staticfiles %}
+
+{% block content %}
+
+<script language=javascript>
+	function removeDweller(id)
+	{
+		document.removeform.elements['data'].value = id
+		document.removeform.submit();
+		document.removeform.elements['data'].value = '0';
+	}
+</script>
+<form action="{% url 'settings' game_id %}" name=removeform method="post">
+	{% csrf_token %}
+	<input type="hidden" name="type" value="remove">
+	<input type="hidden" name="data" value="0">
+</form>
+
+	<h1>{{ game }}</h1>
+
+	{% if game_waiting %}
+	Partita in attesa di giocatori.
+	{% else %}
+	{{ day }}
+	{% endif %}
+	<ul>
+		{% for row in dwellers %}
+		<li>
+			{{ row.text }}
+			{% if im_admin and game_waiting %}
+			<a href=# onclick="removeDweller({{ row.id }})">
+				<img src="{% static "delete.png" %}" height=10 alt="delete"/>
+			</a>
+			{% endif %}
+		</li>
+		{% empty %}
+			No dweller inserted yet.
+		{% endfor %}
+	</ul>
+
+	{% if game_waiting %}
+		{% if im_admin %}
+		<form action="{% url 'settings' game_id %}" method="post">
+			{% csrf_token %}
+			{{ newdweller.as_p }}
+			<input type="hidden" name="type" value="add">
+			<input type="submit" value="Aggiungi abitanti" />
+		</form>
+		{% endif %}
+	{% endif %}
+
+    <h3>Settings</h3>
+	<table>
+        {% for row in settings %}
+		<tr>
+			{% for cell in row %}
+			<td> {{ cell }} </td>
+			{% endfor %}
+		</tr>
+        {% endfor %}
+    </table>
+
+	{% if im_admin %}
+		{% if game_waiting %}
+			<form action="{% url 'settings' game_id %}" method="post">
+				{% csrf_token %}
+				<input type="hidden" name="type" value="start">
+				<input type="submit" value="Inizia partita">
+			</form>
+		{% else %}
+			<form action="{% url 'settings' game_id %}" method="post">
+				{% csrf_token %}
+				<input type="hidden" name="type" value="stop">
+				<input type="submit" value="Cancella partita">
+			</form>
+		{% endif %}
+	{% endif %}
+
+	<h3>Players</h3>
+	<table>
+        {% for row in players %}
+		<tr>
+			{% for cell in row %}
+			<td> {{ cell }} </td>
+			{% endfor %}
+		</tr>
+        {% endfor %}
+    </table>
+{% endblock %}

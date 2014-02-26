@@ -1,5 +1,14 @@
 DESCRIZIONE DATABASE
 
+-	possibilita' per il game admin di eliminare una partita non iniziata
+
+-	nel server, il ruolo "morto" è sempre quantistico
+-	in status, nessun campo = deathday
+-	su azioni multiple, vale l'ultima
+-	in action, il role_id = -PHASE vuol dire voto (fase giorno incrementale se ballottaggi)
+-	day=0 -> partita in attesa, day<0 -> partita terminata, day=1, phase=0 -> il server attiva la partita
+-	implementare countdown nell'interfaccia
+
 -	nella tabella status vengono inseriti i dati NON divisi per il numero di stati
 	attuali il quale si trova in games>max_states
 -	in fase di creazione di partita, invece, games>max_states indica con quanti

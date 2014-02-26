@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load staticfiles %}
+
+{% block content %}
+
+<script language=javascript>
+	function hideStuff()
+	{
+		t = document.getElementById('personal').style;
+		if (t.display == 'none') {
+			t.display = 'block';
+			document.getElementById('hide').src = "{% static "hide.png" %}"
+		}
+		else {
+			t.display = 'none';
+			document.getElementById('hide').src = "{% static "show.png" %}"
+		}
+	}
+</script>
+
+	<h1>{{ village }} ({{ day }})</h1>
+
+	<form action="{% url 'play' player_id %}" method="post">
+		{% csrf_token %}
+		{{ newact.as_p }}
+		<input type="submit" value="Esegui!" />
+	</form>
+
+    <h3>Giocatori</h3>
+	<table>
+		<tr>
+			<td><b><u> Nome </u></b></td>
+			<td> morte </td>
+			<td> giorno </td>
+			<td> amico lupo </td>
+		</tr>
+        {% for player in playerstat %}
+		<tr>
+			<td><b> {{ player.name }} </b></td>
+			<td> {{ player.death }}% </td>
+			<td> {{ player.day }} </td>
+			<td> {{ player.wolf }}% </td>
+		</tr>
+        {% endfor %}
+    </table>
+
+	<h3>News</h3>
+	<div style="height: 150px; display: block; overflow: auto">
+	<ul>
+		{% for news in glogs %}
+		<li>
+			{% for row in news  %}
+			{{ row }} <br />
+			{% endfor %}
+		</li>
+		{% empty %}
+		Non ci sono messaggi.
+		{% endfor %}
+	</ul>
+	</div>
+
+    <h3><a href=# onclick="hideStuff()"><img src="{% static "hide.png" %}" height=15 alt="hide/show" id="hide"/></a>&nbsp; Informazioni personali</h3>
+	<table id='personal'>
+		<tr>
+			<td>
+				<table>
+					{% for role in rolestat %}
+					<tr>
+						{% for cell in role %}
+						<td> {{ cell }} </td>
+						{% endfor %}
+					</tr>
+					{% endfor %}
+				</table>
+			</td>
+			<td>
+			&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+			</td>
+			<td>
+				<div style="height: 150px; display: block; overflow: auto">
+					<table>
+						{% for log in plogs %}
+						<tr>
+							{% for cell in log %}
+							<td> {{ cell }} </td>
+							{% endfor %}
+						</tr>
+						{% empty %}
+						Non ci sono messaggi.
+						{% endfor %}
+					</table>
+				</div>
+			</td>
+		</tr>
+	</table>
+{% endblock %}

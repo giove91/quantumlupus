@@ -3,8 +3,8 @@
 import random
 
 DAY_NONE		 = 0
-PHASE_DAY		 = 1
-PHASE_NIGHT		 = 2
+PHASE_NIGHT		 = 1
+PHASE_DAY		 = 2
 
 ERROR_NEVER		 = 0
 ERROR_TARGET	 = 1

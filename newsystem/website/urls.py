@@ -6,11 +6,11 @@ from game import views
 admin.autodiscover()
 
 urlpatterns = patterns('',
-    url(r'^$', views.home, name='home'),
+	#url(r'^$', views.home, name='home'),
     url(r'^admin/', include(admin.site.urls)),
     url(r'^login/$', 'django.contrib.auth.views.login', name='login'),
     url(r'^logout/$', views.logout_view, name='logout'),
     url(r'^game/', include('game.urls')),
-    url(r'^accounts/profile/', views.home, name='profile'),
+	#url(r'^accounts/profile/', views.home, name='profile'),
 )
 

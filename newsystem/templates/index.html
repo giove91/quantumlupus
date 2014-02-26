@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% load staticfiles %}
+
+{% block content %}
+
+<script language=javascript>
+	function removePlayer(id)
+	{
+		document.removeform.elements['data'].value = id
+		document.removeform.submit();
+		document.removeform.elements['data'].value = '-1';
+	}
+</script>
+<form action="{% url 'index' %}" name=removeform method="post">
+	{% csrf_token %}
+	<input type="hidden" name="type" value="remove">
+	<input type="hidden" name="data" value="-1">
+</form>
+
+
+{% if im_logged %}
+	<form action="{% url 'index' %}" method="post">
+		{% csrf_token %}
+		{{ newplay.as_p }}
+		<input type="hidden" name="type" value="subscribe">
+		<input type="submit" name="subscribe" value="Iscriviti alla partita" />
+		<input type="submit" name="details" value="Dettagli partita" />
+	</form>
+
+	<h3>Active games</h3>
+	<ul>
+		{% for row in plays %}
+		<li>
+			{{ row.game }}
+			(<a href="{% url 'play' row.pid %}">{{ row.plyr }})</a>
+			{% if row.waiting %}
+			<a href=# onclick="removePlayer({{ row.pid }})">
+				<img src="{% static "delete.png" %}" height=10 alt="delete"/>
+			</a>
+			{% endif %}
+		</li>
+		{% empty %}
+		No active games.
+		{% endfor %}
+	</ul>
+
+	<h3>Game admin</h3>
+	<ul>
+		{% for row in games %}
+		<li> <a href="{% url 'settings' row.id %}">{{ row.name }}</a> </li>
+		{% empty %}
+		No games to admin.
+		{% endfor %}
+	</ul>
+	<form action="{% url 'new' %}" method="post">
+		{% csrf_token %}
+		<input type="hidden" name="type" value="new">
+		<input type="submit" value="Crea nuova partita">
+	</form>
+{% else %}
+	Per utilizzare il sito è necessario effettuare il login.
+{% endif %}
+
+{% endblock %}
