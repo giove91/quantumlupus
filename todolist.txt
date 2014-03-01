@@ -1,27 +1,19 @@
-DESCRIZIONE DATABASE
+FEATURE REQUEST
 
--	possibilita' per il game admin di eliminare una partita non iniziata
+-	popup con jquery per conferma di inizia/ferma partita
+-	localization con dizionario piu' flessibile di modo da usarlo per (quasi) tutto
+-	avatars
+-	chat
+
+DOCUMENTAZIONE
 
 -	nel server, il ruolo "morto" è sempre quantistico
--	in status, nessun campo = deathday
--	su azioni multiple, vale l'ultima
--	in action, il role_id = -PHASE vuol dire voto (fase giorno incrementale se ballottaggi)
--	day=0 -> partita in attesa, day<0 -> partita terminata, day=1, phase=0 -> il server attiva la partita
--	implementare countdown nell'interfaccia
-
--	nella tabella status vengono inseriti i dati NON divisi per il numero di stati
-	attuali il quale si trova in games>max_states
--	in fase di creazione di partita, invece, games>max_states indica con quanti
-	stati al massimo va creata la partita
--	il server fa partire la partita quando sono stati assegnati ruoli a tutti i
-	giocatori (contadini compresi). Ruoli in eccesso vengono scartati, e giocatori
-	oltre games>max_players vengono altrettanto scartati e rimossi dalla partita
--	il server memorizza il momento in cui terminerà la prossima fase in
-	games>countdown, come secondi dalla epoch
--	il campo games>password, se non NULL, implica che chi vuole iscriversi alla
-	partita deve inserire quella password
--	il giocatore segnato come games>admin_id può aggiungere ruoli in villages
-	e quindi far sì che la partita possa cominciare
--	il campo villages>is_quantum, se false indica un ruolo che non viene attribuito
-	in modo quantistico ma invece fissato all'inizio (se ne occupa il server comunque)
--	autorefresh? status personale nascondibile? chat?
+-	in status, nessun campo = deathday (e probability e' l'average)
+-	su azioni multiple nel database, vale l'ultima
+-	in action, il role_id = -PHASE vuol dire voto
+	(fase giorno incrementale su ballottaggi)
+-	day=0 -> partita in attesa, day<0 -> partita terminata,
+	day=1, phase=0 -> il server attiva la partita
+-	quando il server fa partire la partita, vengono scartati giocatori oltre i
+	max_players e oltre i characters creati, allo stesso modo vengono scartati
+	i characters oltre il numero di giocatori

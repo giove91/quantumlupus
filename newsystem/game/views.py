@@ -10,6 +10,7 @@ from django.forms import *
 from game.models import *
 import localization as qwl
 import ruleset as qwr
+import time
 
 
 #################
@@ -99,19 +100,32 @@ class IndexView(View):
 					return redirect('settings',form.cleaned_data['game'].pk)
 			if form.is_valid():
 				game = form.cleaned_data['game']
-				if form.cleaned_data['password'] == game.password and len(Player.objects.filter(game=game)) < game.max_players:
+				if form.cleaned_data['password'] == game.password and (game.max_players is None or len(Player.objects.filter(game=game)) < game.max_players):
 					Player.objects.create(user=user,name=form.cleaned_data['name'],game=form.cleaned_data['game'])
 				else:
 					return render(request, 'unauthorized.html')
 			return self.get(request)
-		if request.POST['type'] == 'remove':
+		if request.POST['type'] == 'removeplayer':
 			pid = int(request.POST['data'])
-			if pid < 0:
-				return render(request, 'unauthorized.html')
-			player = Player.objects.get(pk=pid)
+			try:
+				player = Player.objects.get(pk=pid)
+			except:
+				return self.get(request)
 			if player.user != user:
 				return render(request, 'unauthorized.html')
 			player.delete()
+			return self.get(request)
+		if request.POST['type'] == 'removegame':
+			gid = int(request.POST['data'])
+			try:
+				game = Game.objects.get(pk=gid)
+			except:
+				return self.get(request)
+			if game.admin != user or game.day > 0:
+				return render(request, 'unauthorized.html')
+			Player.objects.filter(game=game).delete()
+			Character.objects.filter(game=game).delete()
+			game.delete()
 			return self.get(request)
 
 	def get(self, request):
@@ -121,7 +135,7 @@ class IndexView(View):
 		pls = Player.objects.filter(user=user)
 		pls = [InfoObj(game=p.game.name, plyr=p.name, pid=p.pk, waiting=p.game.day<1) for p in pls]
 		gms = Game.objects.filter(admin=user).exclude(day=-1)
-		gms = [InfoObj(name=g.name,id=g.pk) for g in gms]
+		gms = [InfoObj(name=g.name, id=g.pk, waiting=g.day<1) for g in gms]
 		context = {
 			'im_logged': user is not None,
 			'plays': pls,
@@ -262,6 +276,8 @@ class PlayView(View):
 		rstat = [[dic('role[%d]' % r.role_id),str(int(r.probability*100))+'%'] for r in rstat if r.probability > 0]
 		context = {
 			'village': dic('<VILLAGE "%s">' % player.game.name),
+			'name': player.name,
+			'countdown': player.game.countdown - int(time.time()),
 			'game_running': player.game.day > 0,
 			'day': dic('phase[%d] %d' % (player.game.phase, player.game.day)),
 			'plogs': plogs,

@@ -4,16 +4,18 @@
 {% block content %}
 
 <script language=javascript>
-	function removePlayer(id)
+	function submitForm(type,id)
 	{
-		document.removeform.elements['data'].value = id
-		document.removeform.submit();
-		document.removeform.elements['data'].value = '-1';
+		document.scriptform.elements['data'].value = id;
+		document.scriptform.elements['type'].value = type;
+		document.scriptform.submit();
+		document.scriptform.elements['data'].value = '-1';
+		document.scriptform.elements['type'].value = 'generic';
 	}
 </script>
-<form action="{% url 'index' %}" name=removeform method="post">
+<form action="{% url 'index' %}" name=scriptform method="post">
 	{% csrf_token %}
-	<input type="hidden" name="type" value="remove">
+	<input type="hidden" name="type" value="generic">
 	<input type="hidden" name="data" value="-1">
 </form>
 
@@ -34,7 +36,7 @@
 			{{ row.game }}
 			(<a href="{% url 'play' row.pid %}">{{ row.plyr }})</a>
 			{% if row.waiting %}
-			<a href=# onclick="removePlayer({{ row.pid }})">
+			<a href=# onclick="submitForm('removeplayer', {{ row.pid }})">
 				<img src="{% static "delete.png" %}" height=10 alt="delete"/>
 			</a>
 			{% endif %}
@@ -47,7 +49,14 @@
 	<h3>Game admin</h3>
 	<ul>
 		{% for row in games %}
-		<li> <a href="{% url 'settings' row.id %}">{{ row.name }}</a> </li>
+		<li>
+			<a href="{% url 'settings' row.id %}">{{ row.name }}</a>
+			{% if row.waiting %}
+			<a href=# onclick="submitForm('removegame', {{ row.id }})">
+				<img src="{% static "delete.png" %}" height=10 alt="delete"/>
+			</a>
+			{% endif %}
+		</li>
 		{% empty %}
 		No games to admin.
 		{% endfor %}

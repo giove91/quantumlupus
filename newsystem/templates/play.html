@@ -16,9 +16,26 @@
 			document.getElementById('hide').src = "{% static "show.png" %}"
 		}
 	}
+
+	var count={{ countdown }};
+	function setcountdown()
+	{
+		if (count <= 0) count = 0;
+		document.getElementById("timer").innerHTML=new Date(new Date('1970/1/1 00:00').setSeconds(count)).toTimeString().split(' ')[0].replace(/^00:/, "").replace(/^00:/, "");
+	}
+	function timer()
+	{
+		count = count-1;
+		if (count <= 0) window.location.reload(true);
+		setcountdown()
+	}
+	setInterval(timer, 1000);
 </script>
 
 	<h1>{{ village }} ({{ day }})</h1>
+	<i>{{ name }} (<span id="timer"></span>s alla prossima fase)</i>
+	</br>
+	</br>
 
 	<form action="{% url 'play' player_id %}" method="post">
 		{% csrf_token %}
@@ -93,4 +110,9 @@
 			</td>
 		</tr>
 	</table>
+
+<script>
+	setcountdown()
+</script>
+
 {% endblock %}

@@ -1,9 +1,23 @@
+{% load staticfiles %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <link rel="stylesheet" href="style.css" />
+	<script language="JavaScript" type="text/javascript" src="{% static "jquery-2.1.0.js" %}"></script>
     <title>{% block title %}Quantum Werewolves{% endblock %}</title>
 </head>
+
+<script>
+	var time = new Date().getTime() + 10000;
+	function wait(e) {
+		console.log('wait')
+		time = new Date().getTime() + e.data;
+	}
+	function refresh() {
+		if (new Date().getTime() - time > 0)
+			window.location.reload(true);
+	}
+	setInterval(refresh, 2000);
+</script>
 
 <body>
     <div id="sidebar">
@@ -25,4 +39,10 @@
         {% block content %}{% endblock %}
     </div>
 </body>
+
+<script>
+	$(document.body).on("change keypress", null, 60000, wait);
+	$(document.body).on("focusin", null, 5000, wait);
+</script>
+
 </html>
