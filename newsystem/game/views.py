@@ -2,7 +2,7 @@ from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.models import User
-
+from django.http import HttpResponseForbidden
 from django.shortcuts import render, redirect
 from django.views.generic.base import View
 from django.forms import *
@@ -96,14 +96,14 @@ class IndexView(View):
 		if request.POST['type'] == 'subscribe':
 			form = PlayForm(request.POST,user=user)
 			if 'details' in form.data:
-				if form.is_valid() or True:
+				if form.is_valid():
 					return redirect('settings',form.cleaned_data['game'].pk)
 			if form.is_valid():
 				game = form.cleaned_data['game']
 				if form.cleaned_data['password'] == game.password and (game.max_players is None or len(Player.objects.filter(game=game)) < game.max_players):
 					Player.objects.create(user=user,name=form.cleaned_data['name'],game=form.cleaned_data['game'])
 				else:
-					return render(request, 'unauthorized.html')
+					return HttpResponseForbidden("#01: Subscription denied: wrong password or maximum number of players reached.")
 			return self.get(request)
 		if request.POST['type'] == 'removeplayer':
 			pid = int(request.POST['data'])
@@ -112,7 +112,7 @@ class IndexView(View):
 			except:
 				return self.get(request)
 			if player.user != user:
-				return render(request, 'unauthorized.html')
+				return HttpResponseForbidden("403: Access denied.")
 			player.delete()
 			return self.get(request)
 		if request.POST['type'] == 'removegame':
@@ -122,7 +122,7 @@ class IndexView(View):
 			except:
 				return self.get(request)
 			if game.admin != user or game.day > 0:
-				return render(request, 'unauthorized.html')
+				return HttpResponseForbidden("403: Access denied.")
 			Player.objects.filter(game=game).delete()
 			Character.objects.filter(game=game).delete()
 			game.delete()
@@ -174,18 +174,16 @@ class SettingsView(View):
 		
 		if request.POST['type'] == 'add':
 			if game.admin != user:
-				return render(request, 'unauthorized.html')
+				return HttpResponseForbidden("403: Access denied.")
 			form = DwellerForm(request.POST,user=user)
 			if form.is_valid():
 				for i in xrange(form.cleaned_data['num']):
 					Character.objects.create(game=game,role_id=form.cleaned_data['role'],is_quantum=form.cleaned_data['quantum'])
-			else:
-				return render(request, 'unauthorized.html')
 			return self.get(request, game_id)
 		if request.POST['type'] == 'remove':
 			role_id = int(request.POST['data'])
 			if role_id == 0 or game.admin != user:
-				return render(request, 'unauthorized.html')
+				return HttpResponseForbidden("403: Access denied.")
 			Character.objects.filter(game=game,role_id=abs(role_id)-1,is_quantum=role_id>0).delete()
 			return self.get(request, game_id)
 		if request.POST['type'] == 'start':
@@ -202,7 +200,7 @@ class SettingsView(View):
 		dic = qwl.lang(user.setting.lang)
 		game = Game.objects.get(pk=game_id)
 		if game.day < 0:
-			return render(request, 'unauthorized.html')
+			return HttpResponseForbidden("403: Access denied.")
 		dws = []
 		for i in xrange(qwr.ROLE_WEREWOLF+1):
 			for q in (True,False):
@@ -244,7 +242,7 @@ class PlayView(View):
 		dic = qwl.lang(user.setting.lang)
 		player = Player.objects.get(pk=player_id)
 		if player.user != user:
-			return render(request, 'unauthorized.html')
+			return HttpResponseForbidden("403: Access denied.")
 
 		form = ActionForm(request.POST, player=player, vote=player.game.phase != qwr.PHASE_NIGHT)
 		if form.is_valid():
@@ -259,8 +257,8 @@ class PlayView(View):
 		dic = qwl.lang(user.setting.lang)
 		player = Player.objects.get(pk=player_id)
 		if player.user != user:
-			return render(request, 'unauthorized.html')
-		if player.game.day < 1:
+			return HttpResponseForbidden("403: Access denied.")
+		if player.game.day == 0:
 			return redirect('settings',player.game.pk)
 
 		plogs = list(Log.objects.filter(player=player))
