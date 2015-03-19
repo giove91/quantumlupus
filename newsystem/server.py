@@ -8,6 +8,7 @@ from game.models import *
 import game.ruleset as qwr
 
 import sys, random, time, re
+django.setup()
 
 #################################
 #	utils						#
@@ -288,6 +289,7 @@ class Village:
 			self.game.phase = qwr.PHASE_DAY
 			self.game.countdown = int(time.time()) + (1000000 if self.game.limit_day is None else self.game.limit_day)
 			self.game.save()
+			self.write_status()
 			self.randstate = random.getstate()
 			return False
 		if not self.lynch(a):
@@ -298,6 +300,7 @@ class Village:
 		self.game.phase = qwr.PHASE_NIGHT
 		self.game.countdown = int(time.time()) + (1000000 if self.game.limit_night is None else self.game.limit_night)
 		self.game.save()
+		self.write_status()
 		self.randstate = random.getstate()
 		return False
 	# legge le azioni appena svolte
