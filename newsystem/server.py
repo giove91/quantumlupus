@@ -105,14 +105,17 @@ class QuantumState:
 			if max_states < len(self.quantum):
 				self.quantum = random.sample(self.quantum, max_states)
 
+    # restituisce l'attuale numero di stati
 	def __len__(self):
 		return len(self.quantum)
 
+    # incrementa il contatore temporale di n giorni
 	def __iadd__(self,n):
 		self.clean()
 		self.day += n
 		return self
-	
+
+    # calcola le statistiche e lo stato di fine partita e restituisce le statistiche dell'id-esimo giocatore
 	def __getitem__(self,id):
 		if self.status is not None:
 			return self.status[id]
@@ -145,6 +148,7 @@ class QuantumState:
 			self.end = False
 		return self.status[id]
 
+    # restituisce una rappresentazione leggibile delle statistiche della partita
 	def __repr__(self):
 		d = qwl.it
 		r = [False for i in xrange(qwr.ROLE_WEREWOLF+1)]
@@ -171,6 +175,7 @@ class QuantumState:
 			s += '\n%s' % '\t'.join(t)
 		return s
 
+    # restituisce il vincitore della partita -- FUNZIONA SE LA PARTITA FINISCE SENZA SAPERE COME?
 	def winner(self):
 		l = self[0]
 		if self.end is None:
@@ -179,6 +184,7 @@ class QuantumState:
 		self.status = None
 		return self.end
 
+    # fa agire i ruoli passivi e cancella le flag (DEATH_NULL)
 	def clean(self):
 		for r in xrange(qwr.ROLE_WEREWOLF):
 			if qwr.ROLE_DESC[r][1] == qwr.ROLE_PASSIVE and r in [x[0] for x in self.quantum[0]]:
@@ -190,18 +196,19 @@ class QuantumState:
 					s[i][1] = 0
 		self.status = None
 
+    # filtra gli stati lasciando solo quelli su cui check restituisce true
 	def filter(self, check):
 		j = 0
 		for i in xrange(len(self)):
 			if check(self.quantum[i]):
 				self.quantum[j] = self.quantum[i]
-				self.quantum[j]
 				j += 1
 		if j == 0:
 			return False
 		self.quantum = self.quantum[:j]
 		return True
 
+    # modifica lo stato quantistico linciando il giocatore n
 	def lynch(self, n):
 		if not self.filter(lambda s: s[n][1] == 0):
 			return False
@@ -212,6 +219,7 @@ class QuantumState:
 		self.status = None
 		return True
 
+    # fa agire il giocatore c come ruolo r sul giocatore t sapendo che le azioni giocate sono a
 	def act(self, a, c, r, t):
 		if qwr.ROLE_DESC[r][1] == qwr.ROLE_MEASURE:
 			s = random.choice(self.quantum)

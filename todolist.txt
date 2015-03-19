@@ -1,9 +1,26 @@
 FEATURE REQUEST
 
--	popup con jquery per conferma di inizia/ferma partita
--	localization con dizionario piu' flessibile di modo da usarlo per (quasi) tutto
--	avatars
+-	login (social auth)
+		https://pypi.python.org/pypi/python-social-auth
 -	chat
+		https://pypi.python.org/pypi/django-socketio
+-	localization
+	-	markov chain per creare nomi
+	-	https://docs.djangoproject.com/en/1.8/topics/i18n/translation/
+	-	https://pypi.python.org/pypi/django-rosetta
+-	utilizzare ModelForm dove applicabile
+-	opzioni sul voto dei lupi (lupo alpha, maggioranza relativa/assoluta/unanimita')
+	> da modificare in act_werewolf :-(
+-	t in ROLE_PASSIVE non ha senso
+-	modellizzare omogeneamente le flags come DEATH_NULL
+-	altri ruoli possibili (sequestratore, incantatore, fratello...)
+-	popup (con jquery?) per conferma di inizia/ferma partita
+-	grafica
+	-	avatars
+	-	temi per i villaggi
+-	sfida i tuoi amici
+		https://pypi.python.org/pypi/django-social-friends-finder
+		https://pypi.python.org/pypi/django-facebook
 
 DOCUMENTAZIONE
 

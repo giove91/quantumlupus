@@ -12,6 +12,7 @@ class Setting(models.Model):
 	lang = models.CharField(max_length=256)
 	won = models.IntegerField(default=0)
 	lost = models.IntegerField(default=0)
+#    level = models.IntegerField(default=0)
 	def __unicode__(self):
 		return unicode(self.user.username)
 
@@ -20,11 +21,13 @@ class Game(models.Model):
 	name = models.CharField(max_length=256)
 	password = models.CharField(max_length=256, null=True, blank=True)
 	admin = models.ForeignKey(User)
+#    theme = models.IntegerField(default=0)
 
 	allow_dup = models.BooleanField(default=False)
 	tie_draw = models.BooleanField(default=False)
 	tie_play_off = models.BooleanField(default=False)
 	tie_conclave = models.BooleanField(default=False)
+#    wolf_vote = models.IntegerField(default=0)
 	limit_day = models.IntegerField(null=True, blank=True)
 	limit_night = models.IntegerField(null=True, blank=True)
 	max_players = models.IntegerField(null=True, blank=True)
